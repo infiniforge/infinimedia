@@ -51,6 +51,7 @@ internal class FxArtworkView @JvmOverloads constructor(
     @Volatile private var graphFallback: Pair<FxGraph, FxGraph>? = null
     @Volatile private var audio: AudioFrameMetadata? = null
     @Volatile private var resumed = false
+    @Volatile private var hostResumed = false
     @Volatile private var outputWidth = 0
     @Volatile private var outputHeight = 0
     @Volatile private var surfaceTexture: SurfaceTexture? = null
@@ -70,12 +71,19 @@ internal class FxArtworkView @JvmOverloads constructor(
     var onRenderAvailabilityChanged: ((Boolean) -> Unit)? = null
     private var frameIndex = 0L
     private var lastFrameNanos = 0L
+    private var consecutiveRenderFailures = 0
 
     private val frameRunnable = Runnable {
         synchronized(frameLock) { frameScheduled = false }
         if (!resumed) return@Runnable
         val rendered = renderFrame()
-        if (rendered && resumed && sourceImage.bitmap != null) scheduleFrame(FRAME_INTERVAL_MS)
+        if (rendered) consecutiveRenderFailures = 0
+        else if (resumed && sourceImage.bitmap != null && surfaceTexture != null && outputWidth > 0 && outputHeight > 0) {
+            consecutiveRenderFailures++
+        }
+        if (resumed && sourceImage.bitmap != null && surfaceTexture != null && outputWidth > 0 && outputHeight > 0) {
+            scheduleFrame(if (rendered) FRAME_INTERVAL_MS else FxRenderRetryDelay.forFailureCount(consecutiveRenderFailures))
+        }
     }
 
     init {
@@ -123,12 +131,14 @@ internal class FxArtworkView @JvmOverloads constructor(
     }
 
     fun onResume() {
+        hostResumed = true
         resumed = true
         if (isAvailable) ensureRenderThread()
         requestFrame()
     }
 
     fun onPause() {
+        hostResumed = false
         resumed = false
         cancelScheduledFrame()
     }
@@ -152,24 +162,43 @@ internal class FxArtworkView @JvmOverloads constructor(
     }
 
     override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) {
-        surfaceTexture = surface
+        if (surfaceTexture !== surface) return
         outputWidth = width
         outputHeight = height
         requestFrame()
     }
 
     override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
-        if (surfaceTexture === surface) surfaceTexture = null
+        if (surfaceTexture !== surface) {
+            DiagnosticLog.record("audio.fx.surface.stale-destroy", "Ignored destruction of a detached SurfaceTexture")
+            return true
+        }
+        surfaceTexture = null
         outputWidth = 0
         outputHeight = 0
         setRenderAvailability(false)
-        DiagnosticLog.record("audio.fx.surface.destroyed", "SurfaceTexture destroyed")
+        DiagnosticLog.record("audio.fx.surface.destroyed", "Current SurfaceTexture destroyed")
         cancelScheduledFrame()
-        onRenderThreadAndWait { releaseSession() }
+        onRenderThreadAndWait {
+            if (session?.surfaceTexture === surface) releaseSession()
+        }
         return true
     }
 
     override fun onSurfaceTextureUpdated(surface: SurfaceTexture) = Unit
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (hostResumed) {
+            resumed = true
+            if (isAvailable && surfaceTexture != null) {
+                outputWidth = width
+                outputHeight = height
+                consecutiveRenderFailures = 0
+                requestFrame()
+            }
+        }
+    }
 
     override fun onDetachedFromWindow() {
         releaseForHostPause()
@@ -374,8 +403,12 @@ internal class FxArtworkView @JvmOverloads constructor(
             }
         } catch (error: Throwable) {
             reportFailure("render:${error.message}", error)
-            hideAfterFailure(source.revision)
             releaseSession()
+            if ((error.message ?: "").contains("egl", ignoreCase = true)) {
+                DiagnosticLog.record("audio.fx.render.retry", "Retrying transient EGL failure: ${error.message}")
+            } else {
+                hideAfterFailure(source.revision)
+            }
             false
         }
     }

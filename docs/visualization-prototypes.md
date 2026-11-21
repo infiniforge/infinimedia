@@ -217,18 +217,23 @@ syntax validation at this commit.
 ### Full-output artwork-palette lightning — 2026-11-21
 
 The current graph defaults to 100% of the image width and height. The lightning
-generator draws outlined electric paths only, with no filled rectangular bars;
-its outline colors cycle through the eight most common unique colors from a
-deterministic 32×32 bitmap sample quantized to six-bit RGB. The library receives
-these values through `FxMetadataChannels`, so palette extraction remains an
-app-owned operation. Gain is linear by default to preserve the full normalized
-band range, and present zero values remain zero height.
+generator draws outlined electric paths only, with no filled rectangular bars.
+Its procedural lightning evolves at 20× real time, and 8× stroke width lets
+neighboring bolts overlap. Outline colors cycle through the eight most common
+unique colors from a deterministic 32×32 bitmap sample quantized to six-bit RGB.
+The library receives these values through `FxMetadataChannels`, so palette
+extraction remains an app-owned operation. `FxArtworkView` resumes rendering
+when reattached after fullscreen reparenting, ignores stale SurfaceTexture
+destroy callbacks, and retries transient EGL lifecycle failures with bounded
+backoff. Gain is linear by default to preserve the full normalized band range,
+and present zero values remain zero height.
 
-The app pins libinfinifx commit `d30897b6a5397afb1be041833b33531a196b0c2b`.
+The app pins libinfinifx commit `0d62f0bd132974a61e81e82a52e183150db76dec`.
 PASS: `python3 scripts/fetch-dependencies.py --check` verified all pinned
 revisions. PASS: `ANDROID_HOME="$HOME/android-sdk" ./build.sh --no-daemon
 --max-workers=1 --console=plain` assembled `InfiniMedia-debug.apk` and passed all
-132 viewer-audio JVM tests (0 failures, 0 errors, 0 skipped), including palette
-ranking/deduplication and full-output graph defaults. `adb devices -l` reported
-no attached device, so visual palette contrast, actual edge coverage, GLES
-shader-driver behavior, and performance remain **not verified on device**.
+133 viewer-audio JVM tests (0 failures, 0 errors, 0 skipped), including palette
+ranking/deduplication, full-output graph defaults, and bounded render retry
+delays. `adb devices -l` reported no attached device, so fullscreen GLES
+recovery, visual palette contrast, actual edge coverage, shader-driver behavior,
+and performance remain **not verified on device**.

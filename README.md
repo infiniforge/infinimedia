@@ -246,8 +246,10 @@ GLES performance acceptance; see [visualization integration status](docs/visuali
 
 ## InfiniFX display and motion follow-up — 2026-11-21
 
-The graph defaults to 100% output width and height with no outer inset. It renders only outlined lightning traces, with each frequency column using one of up to eight popular colors from a deterministic 32×32 sample quantized to six-bit RGB, deduplicated by color bin, and ranked by frequency. Present zero-valued frequency bands have zero height; the idle baseline applies only when band data is missing. Rotozoom smooths tempo and audio modulation, integrates a continuous rotation phase, and clamps its rate to ±4 rad/s.
-The library update is pinned at `d30897b6a5397afb1be041833b33531a196b0c2b`.
-The standalone app build passed 132 viewer-audio tests and assembled the debug
-APK. Device visual and performance acceptance remain outstanding; see
+The graph defaults to 100% output width and height with no outer inset. It renders only outlined lightning traces at 20× animation speed with 8× strokes that can overlap; each frequency column uses one of up to eight popular colors from a deterministic 32×32 sample quantized to six-bit RGB, deduplicated by color bin, and ranked by frequency. Present zero-valued frequency bands have zero height; the idle baseline applies only when band data is missing. Rotozoom smooths tempo and audio modulation, integrates a continuous rotation phase, and clamps its rate to ±4 rad/s.
+The library update is pinned at `0d62f0bd132974a61e81e82a52e183150db76dec`.
+The standalone app build passed 133 viewer-audio tests and assembled the debug
+APK. The artwork view resumes its render loop after fullscreen reparenting and
+retries transient EGL failures with bounded backoff. Device visual and
+performance acceptance remain outstanding; see
 [visualization status](docs/visualization-prototypes.md).
