@@ -15,7 +15,7 @@ the pane with a centered crop by default. Square art on a 16:9 pane is fitted to
 pane width; its Y begins 7/32 of the pane width above the top edge, cropping
 7/32 from each vertical edge. Each image graph starts with tempo-smoothed,
 bounded album-art rotozoom, then runs two temporary randomized effect stages,
-and finishes with a lightning-spectrum layer centered at 90% width by default.
+and finishes with a full-width, full-height lightning-spectrum layer. The lightning has no filled bar boxes; its outlined bolts cycle through the eight most popular colors detected from a deterministic six-bit RGB quantization of the artwork.
 The MTV-style metadata
 label is player UI outside the graph, so it never consumes or reduces the
 effects' render area; it stays above the artwork, FX output, and spectrum.
@@ -38,8 +38,7 @@ The randomized stages currently choose CRT, handheld LCD, water refraction,
 heat ripple, kaleidoscope, or a fire generator with explicit alpha composition.
 This temporary policy changes one stage when the visual playlist item changes;
 there is no effect picker yet. The spectrum generator maps the normalized 16 PCM
-bands to centered colored electric bars (90% output width by default; a zero
-band has zero height). Its full-width segmented fallback is anchored at the
+bands to outlined electric lightning spanning the full output width and height by default; no filled bar boxes are drawn. Lightning outline colors use the artwork's top detected palette colors; present zero-valued bands have zero height. Its full-width segmented fallback is anchored at the
 pane's bottom edge until the first GPU frame swaps successfully, and
 returns if the graph cannot render. Tap the
 visual pane to reveal EDIT FX beside the full-screen button.
@@ -247,11 +246,8 @@ GLES performance acceptance; see [visualization integration status](docs/visuali
 
 ## InfiniFX display and motion follow-up — 2026-11-21
 
-The graph-width slider defaults to 90% and keeps the lightning bars centered.
-Present zero-valued frequency bands have zero height; the idle baseline applies
-only when band data is missing. Rotozoom smooths tempo and audio modulation,
-integrates a continuous rotation phase, and clamps its rate to ±4 rad/s.
-The library update is pinned at `ea06a83ed1202b5c73e69bc1497270a8eb2e1fe7`.
-The standalone app build passed 129 viewer-audio tests and assembled the debug
+The graph defaults to 100% output width and height with no outer inset. It renders only outlined lightning traces, with each frequency column using one of up to eight popular colors from a deterministic 32×32 sample quantized to six-bit RGB, deduplicated by color bin, and ranked by frequency. Present zero-valued frequency bands have zero height; the idle baseline applies only when band data is missing. Rotozoom smooths tempo and audio modulation, integrates a continuous rotation phase, and clamps its rate to ±4 rad/s.
+The library update is pinned at `d30897b6a5397afb1be041833b33531a196b0c2b`.
+The standalone app build passed 132 viewer-audio tests and assembled the debug
 APK. Device visual and performance acceptance remain outstanding; see
 [visualization status](docs/visualization-prototypes.md).

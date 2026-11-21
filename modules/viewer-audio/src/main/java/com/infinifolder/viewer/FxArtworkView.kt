@@ -22,6 +22,7 @@ import org.infiniforge.fx.api.FxColorEncoding
 import org.infiniforge.fx.api.FxDiscontinuity
 import org.infiniforge.fx.api.FxFrameInput
 import org.infiniforge.fx.api.FxGeometry
+import org.infiniforge.fx.api.FxMetadataChannels
 import org.infiniforge.fx.api.FxGraph
 import org.infiniforge.fx.api.FxRect
 import org.infiniforge.fx.api.FxRenderResult
@@ -41,9 +42,9 @@ internal class FxArtworkView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
 ) : TextureView(context, attrs), TextureView.SurfaceTextureListener {
-    private data class SourceImage(val bitmap: Bitmap?, val revision: Long)
+    private data class SourceImage(val bitmap: Bitmap?, val revision: Long, val channels: FxMetadataChannels)
 
-    @Volatile private var sourceImage = SourceImage(null, 0L)
+    @Volatile private var sourceImage = SourceImage(null, 0L, FxMetadataChannels())
     private var nextSourceRevision = 0L
     @Volatile private var graph = FxGraph("neutral-pass-through", emptyList(), emptyList())
     /** Pair of the requested graph and a lightning-only graph used if a filter graph fails. */
@@ -95,7 +96,9 @@ internal class FxArtworkView @JvmOverloads constructor(
 
     fun setSourceBitmap(bitmap: Bitmap?) {
         nextSourceRevision++
-        sourceImage = SourceImage(bitmap, nextSourceRevision)
+        val palette = bitmap?.let(ArtworkPaletteDetector::detect) ?: ArtworkPalette(listOf(ArtworkPaletteColor.DEFAULT))
+        val channels = FxMetadataChannels(palette.toChannels())
+        sourceImage = SourceImage(bitmap, nextSourceRevision, channels)
         audioDiagnosticState = ""
         DiagnosticLog.record("audio.fx.source", "revision=$nextSourceRevision size=${bitmap?.width ?: 0}x${bitmap?.height ?: 0}")
         setRenderAvailability(false)
@@ -317,6 +320,7 @@ internal class FxArtworkView @JvmOverloads constructor(
                     sampling = FxSampling.LINEAR,
                 ),
                 audio = audio?.takeIf { now >= it.timestampNanos && now - it.timestampNanos <= AUDIO_MAX_AGE_NANOS },
+                channels = source.channels,
             )
             val requestedGraph = graph
             val fallback = graphFallback?.takeIf { it.first === requestedGraph }?.second

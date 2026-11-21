@@ -40,18 +40,23 @@ distort:rotozoom motion, then holds two sequential randomized image-effect stage
 On each changed visual playlist item it chooses one randomized stage and
 replaces it with a different available effect ID. The final graph adds an
 independent generator:lightning-spectrum branch and alpha-blends it over the
-processed artwork. Its 16 colored electric bars are centered in 90% of the output
-width by default and use the current normalized audio bands. Present zero-valued
-bands have zero height; the low autonomous baseline is used only when band data
-is missing. The segmented prototype is also full-width
+processed artwork. It covers the output width and height by default and draws
+only outlined lightning paths: there are no filled rectangular bar bodies. Each
+frequency slot selects from up to eight popular artwork colors. The app samples
+the bitmap on a deterministic 32×32 grid, quantizes RGB to six bits total (two
+bits per channel), merges duplicate bins, averages colors within each bin, and
+orders the palette by sample count. The app passes normalized sRGB palette
+channels to the library; no image analysis or Android dependency is added to
+libinfinifx. Present zero-valued bands have zero height; the low autonomous
+baseline is used only when band data is missing. The segmented prototype is also full-width
 and keeps a quiet baseline while acting as the first-frame or error fallback.
 The randomized options are CRT, LCD, water refraction, heat ripple, kaleidoscope,
 and the independent fire generator followed by an explicit alpha blend. This is
 temporary testing behavior, not a selection UI; deliberate user/app selection
 can later replace this policy while retaining the public graph/effect
 contracts. Tapping the visual pane reveals EDIT FX beside the full-screen button
-for the same four-second overlay window. It adjusts gain, maximum height,
-width (default 90%), spacing, glow, and idle baseline, applying changes to the active graph as the
+for the same four-second overlay window. It adjusts linear gain, maximum height,
+width (default 100%), spacing, glow, and idle baseline, applying changes to the active graph as the
 sliders move. Renderer status, band levels, and errors are recorded in the app
 DiagnosticLog under audio.fx.*. Effect IDs and parameter schemas come from
 libinfinifx.
@@ -194,15 +199,11 @@ reported 129 tests, 0 failures. adb devices -l reports no attached device;
 metadata appearance and GLES layer visibility remain not verified on device.
 
 
-### Centered spectrum and smoothed rotozoom — 2026-11-21
+### Centered spectrum and smoothed rotozoom — historical checkpoint, 2026-11-21
 
-`dependencies.lock.json` pins libinfinifx commit
-`ea06a83ed1202b5c73e69bc1497270a8eb2e1fe7`. The lightning generator is centered
-at 90% output width by default; the editor exposes that width, and present
-zero-valued audio bands produce zero-height bars. Missing band data can still
-use the idle baseline. Rotozoom smooths BPM over 0.9 seconds, smooths RMS/onset
-modulation over 0.18 seconds, integrates phase continuously, and caps speed at
-±4 rad/s.
+At this earlier checkpoint, the lightning generator used a 90% width default.
+The later full-output outline and artwork-palette behavior is recorded below.
+The then-current build verified normalized metadata and bounded rotozoom.
 
 PASS: `./build.sh --max-workers=1 --console=plain` completed after resolving the
 pinned source dependencies, assembled `InfiniMedia-debug.apk`, and passed all
@@ -211,3 +212,23 @@ device. Shader-driver compilation, zero-band pixels, visual width, and runtime
 rotozoom smoothness remain **not verified on device**. The library checkout
 separately passed its portable/GLES tests, AAR/sample build, and 12-stage GLSL
 syntax validation at this commit.
+
+
+### Full-output artwork-palette lightning — 2026-11-21
+
+The current graph defaults to 100% of the image width and height. The lightning
+generator draws outlined electric paths only, with no filled rectangular bars;
+its outline colors cycle through the eight most common unique colors from a
+deterministic 32×32 bitmap sample quantized to six-bit RGB. The library receives
+these values through `FxMetadataChannels`, so palette extraction remains an
+app-owned operation. Gain is linear by default to preserve the full normalized
+band range, and present zero values remain zero height.
+
+The app pins libinfinifx commit `d30897b6a5397afb1be041833b33531a196b0c2b`.
+PASS: `python3 scripts/fetch-dependencies.py --check` verified all pinned
+revisions. PASS: `ANDROID_HOME="$HOME/android-sdk" ./build.sh --no-daemon
+--max-workers=1 --console=plain` assembled `InfiniMedia-debug.apk` and passed all
+132 viewer-audio JVM tests (0 failures, 0 errors, 0 skipped), including palette
+ranking/deduplication and full-output graph defaults. `adb devices -l` reported
+no attached device, so visual palette contrast, actual edge coverage, GLES
+shader-driver behavior, and performance remain **not verified on device**.

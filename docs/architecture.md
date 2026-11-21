@@ -19,8 +19,7 @@ or Infiniscribe as Gradle projects and does not import their application source.
   texture lifecycle, preserving normal Android child-view composition.
   RandomFxPipeline fixes tempo-smoothed, bounded rotozoom as the first artwork
   stage, randomly replaces one of two following effect stages per changed visual
-  item, then alpha-composites lightning-spectrum bars centered at 90% width by
-  default; zero-valued bands have zero height. A player-owned
+  item, then alpha-composites a full-output lightning-spectrum layer with outlined bolts and no filled bar bodies. The bolts cycle through up to eight popular colors from artwork sampled on a deterministic 32×32 grid and quantized to six-bit RGB (two bits per channel), with duplicate bins merged and ranked by frequency. Zero-valued bands have zero height. A player-owned
   metadata label sits above the full-pane effect stack. libinfinisound supplies
   estimated tempo and low-band transient events through the existing PCM
   analyzer. The app owns a small live parameter editor and metadata fade schedule.

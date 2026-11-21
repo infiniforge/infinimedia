@@ -29,6 +29,13 @@ class FxPipelineTest {
         }
     }
 
+    @Test fun lightningSpectrumDefaultsToEdgeToEdgeImageCoverage() {
+        val node = RandomFxPipeline(Random(9)).graph().nodes.single { it.id == "lightning_spectrum" }
+        assertEquals(1f, (node.parameters.getValue("widthScale") as org.infiniforge.fx.api.FxParameterValue.FloatValue).value)
+        assertEquals(1f, (node.parameters.getValue("maxHeight") as org.infiniforge.fx.api.FxParameterValue.FloatValue).value)
+        assertEquals(1f, (node.parameters.getValue("gain") as org.infiniforge.fx.api.FxParameterValue.FloatValue).value)
+    }
+
     @Test fun lightningSpectrumStartsWithAVisibleIdleBaseline() {
         val pipeline = RandomFxPipeline(Random(9))
         val node = pipeline.graph().nodes.single { it.id == "lightning_spectrum" }

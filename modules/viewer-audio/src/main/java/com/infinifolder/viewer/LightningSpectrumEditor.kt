@@ -24,7 +24,7 @@ internal class LightningSpectrumEditor(
             setPadding(dp(20), dp(4), dp(20), dp(4))
         }
         content.addView(TextView(context).apply {
-            text = "Lightning bars are centered with a small edge margin. Zero-valued bands have zero height."
+            text = "Full-width lightning only, outlined in the detected artwork color. Zero-valued bands have zero height."
             textSize = 12f
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             bottomMargin = dp(10)

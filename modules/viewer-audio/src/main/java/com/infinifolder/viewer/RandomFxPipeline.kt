@@ -97,9 +97,9 @@ internal class RandomFxPipeline(private val random: Random = Random.Default) {
 }
 
 internal data class LightningSpectrumStyle(
-    val gain: Float = 2.6f,
-    val maxHeight: Float = .88f,
-    val widthScale: Float = .9f,
+    val gain: Float = 1f,
+    val maxHeight: Float = 1f,
+    val widthScale: Float = 1f,
     val barGap: Float = .14f,
     val glow: Float = .9f,
     val idleHeight: Float = .14f,
