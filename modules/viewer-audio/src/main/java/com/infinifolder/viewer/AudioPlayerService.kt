@@ -83,7 +83,10 @@ data class AudioTrack(
     /** Stable source identity that can replace a temporary selection URI later. */
     val sourceReference: String? = null,
     val directoryReference: String? = null,
-    val directoryCoverReference: String? = null
+    val directoryCoverReference: String? = null,
+    /** Optional tags when a host or future metadata reader can supply them. */
+    val recordCompany: String? = null,
+    val producer: String? = null
 ) {
     /** Android URI currently used to read this item. */
     val contentUri: Uri? get() = uri.takeIf {

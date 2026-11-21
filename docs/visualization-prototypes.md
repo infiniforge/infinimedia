@@ -65,10 +65,15 @@ edges. This crop is passed in FxFrameInput.geometry.contentRect, so graph output
 and source presentation show the same centered region. ArtworkCropGeometryTest
 locks this mapping.
 
-The MTV-style title/details label is a player-owned child overlay outside the FX
-graph. It is brought above the GPU artwork and spectrum layers and does not
-shrink the graph's full-pane viewport. Its black background is approximately
-15% opaque. For audio with a known duration longer than 22 seconds, it remains
+The MTV-style metadata label is a player-owned child overlay outside the FX
+graph. Audio metadata uses five rows in this order: artist, quoted track title,
+album, record company, and producer. All rows use the same font; missing label
+or producer metadata is an empty row. When no actual metadata is present, the
+filename is shown alone. The current metadata readers provide artist/title/album;
+record company and producer are optional AudioTrack fields and remain blank
+until a source supplies them. The label is brought above the GPU artwork and
+spectrum layers and does not shrink the graph's full-pane viewport. Its black
+background is approximately 15% opaque. For audio with a known duration longer than 22 seconds, it remains
 visible through 10 seconds, fades out during seconds 10–11, and fades in during
 the final 11–10 seconds. A backward seek recomputes opacity from playhead time.
 Short tracks keep the label visible because the hide and end-fade windows would
@@ -167,3 +172,17 @@ center-crop mapping remains unchanged: for square source art in a 16:9 pane,
 the visible source rectangle is Y=7/32..25/32, centered at Y=1/2. No Android
 device was connected after the fix, so actual shader-driver compilation and
 the artwork's on-screen placement are not yet verified on device.
+
+
+### MTV metadata label follow-up — 2026-11-21
+
+The audio lower third now renders artist, quoted title, album, record company,
+and producer as five rows using the same typeface and size. Missing company or
+producer values keep their row blank. If all available metadata is absent, the
+filename is shown alone. Optional company/producer fields are preserved in the
+app's saved playlist snapshot; current metadata readers do not populate them.
+
+PASS: ANDROID_HOME="$HOME/android-sdk" ./build.sh --no-daemon --max-workers=1 --console=plain
+completed and assembled InfiniMedia-debug.apk. The viewer-audio JVM suite
+reported 129 tests, 0 failures. adb devices -l reports no attached device;
+metadata appearance and GLES layer visibility remain not verified on device.

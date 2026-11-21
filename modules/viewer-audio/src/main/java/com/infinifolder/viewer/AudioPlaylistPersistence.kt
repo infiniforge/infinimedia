@@ -73,6 +73,8 @@ internal class AudioPlaylistStore(context: Context) {
                 .put("title", track.title)
                 .putNullable("artist", track.artist)
                 .putNullable("album", track.album)
+                .putNullable("recordCompany", track.recordCompany)
+                .putNullable("producer", track.producer)
                 .put("durationMs", track.durationMs)
                 .put("startByte", track.startByte)
                 .put("lengthBytes", track.lengthBytes)
@@ -126,6 +128,8 @@ internal class AudioPlaylistStore(context: Context) {
                 title = item.optString("title").ifBlank { itemName },
                 artist = item.stringOrNull("artist"),
                 album = item.stringOrNull("album"),
+                recordCompany = item.stringOrNull("recordCompany"),
+                producer = item.stringOrNull("producer"),
                 durationMs = item.optLong("durationMs", 0L).coerceAtLeast(0L),
                 startByte = item.optLong("startByte", 0L).coerceAtLeast(0L),
                 lengthBytes = item.optLong("lengthBytes", -1L),

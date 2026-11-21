@@ -1696,8 +1696,9 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
         }
         visualPaneTitleText = TextView(this).apply {
             text = ""
-            textSize = 13f
-            typeface = Typeface.DEFAULT_BOLD
+            textSize = 10f
+            typeface = Typeface.DEFAULT
+            includeFontPadding = false
             setTextColor(Color.WHITE)
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
@@ -1707,8 +1708,9 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
             text = ""
             textSize = 10f
             typeface = Typeface.DEFAULT
+            includeFontPadding = false
             setTextColor(0xFFE0E0E0.toInt())
-            maxLines = 2
+            maxLines = 4
             ellipsize = android.text.TextUtils.TruncateAt.END
         }
         visualPaneMetadata.addView(visualPaneDetailsText, LinearLayout.LayoutParams(-2, -2))
@@ -3867,6 +3869,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
         val sub = listOfNotNull(track.artist, track.album).filter { it.isNotBlank() }.joinToString(" • ")
         trackArtistText.text = if (sub.isNotBlank()) sub else "Infinifolder Media"
         visualPaneTitleText.text = track.title.ifBlank { track.fileName }
+        visualPaneDetailsText.visibility = View.VISIBLE
         val metadataDetails = listOfNotNull(
             track.artist?.takeIf(String::isNotBlank)?.let { "ARTIST  $it" },
             track.album?.takeIf(String::isNotBlank)?.let { "ALBUM  $it" }
@@ -3937,8 +3940,19 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
             }
             PlaylistMediaKind.AUDIO -> {
                 val audioArtwork = track.artwork ?: track.directoryArtwork
+                val labelRows = MtvMetadataLabelFormatter.format(
+                    fileName = track.fileName,
+                    title = track.title,
+                    artist = track.artist,
+                    album = track.album,
+                    recordCompany = track.recordCompany,
+                    producer = track.producer,
+                )
                 visualPaneMetadata.visibility = View.VISIBLE
-                visualPaneDetailsText.text = metadataDetails
+                visualPaneTitleText.text = labelRows.firstOrNull().orEmpty().ifBlank { "\u00A0" }
+                val remainingRows = labelRows.drop(1)
+                visualPaneDetailsText.visibility = if (remainingRows.isEmpty()) View.GONE else View.VISIBLE
+                visualPaneDetailsText.text = remainingRows.joinToString("\n") { it.ifBlank { "\u00A0" } }
                 if (ansiOverlay != null) {
                     fxArtworkView.setSourceBitmap(null)
                     visualPaneVisualizerView.visibility = View.GONE
