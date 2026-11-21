@@ -149,3 +149,21 @@ These are compiler and portable test results. `adb devices -l` listed no
 attached device during this checkpoint, so album-art cropping, layer order,
 rotozoom tempo behavior, label fade appearance, shader output, and frame timing
 remain **not verified on device**.
+
+
+### GLES shader compile follow-up — 2026-11-21
+
+The latest supplied diagnostic bundle reports a 768×768 artwork bitmap and a
+1276×717 FX surface, but every graph render fails before drawing with the
+#version directive not on the first line. The screenshot therefore shows the
+underlying ImageView fallback; it does not show the rotozoom pipeline.
+
+The fix is in libinfinifx commit
+64be3fec6bf3cf65e9ee1ca2b1a019f6a33c54ab, now pinned in
+dependencies.lock.json. The backend trims Kotlin raw-string indentation
+before GLES compilation. A fresh Infinimedia build against that pinned commit
+passed all 125 viewer-audio JVM tests and assembled the debug APK. The
+center-crop mapping remains unchanged: for square source art in a 16:9 pane,
+the visible source rectangle is Y=7/32..25/32, centered at Y=1/2. No Android
+device was connected after the fix, so actual shader-driver compilation and
+the artwork's on-screen placement are not yet verified on device.
