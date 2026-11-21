@@ -11,7 +11,9 @@ Reusable decoding, synthesis and timing belong to libinfinisound/libinfinivideo.
 ## Visualization pipeline
 
 The media pane runs libinfinifx over album art and static images. Artwork fills
-the pane with a center crop by default. Each image graph starts with a fixed
+the pane with a centered crop by default. Square art on a 16:9 pane is fitted to
+pane width; its Y begins 7/32 of the pane width above the top edge, cropping
+7/32 from each vertical edge. Each image graph starts with a fixed
 album-art rotozoom stage, then runs two temporary randomized effect stages, and
 finishes with a full-width lightning-spectrum layer. The MTV-style metadata
 label is player UI outside the graph, so it never consumes or reduces the

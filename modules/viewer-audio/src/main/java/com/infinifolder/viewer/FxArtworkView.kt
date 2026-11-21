@@ -295,7 +295,7 @@ internal class FxArtworkView @JvmOverloads constructor(
             val delta = if (lastFrameNanos == 0L) 0f else
                 ((now - lastFrameNanos).coerceAtLeast(0L) / 1_000_000_000f).coerceIn(0f, 0.1f)
             lastFrameNanos = now
-            val sourceCrop = centerCropRect(bitmap.width, bitmap.height, width, height)
+            val sourceCrop = ArtworkCropGeometry.centerCropSourceRect(bitmap.width, bitmap.height, width, height)
             val frame = FxFrameInput(
                 presentationTimeNanos = now,
                 deltaTimeSeconds = delta,
@@ -412,20 +412,6 @@ internal class FxArtworkView @JvmOverloads constructor(
         }
         DiagnosticLog.record("audio.fx.render.availability", "available=$available")
         post { onRenderAvailabilityChanged?.invoke(available) }
-    }
-
-    private fun centerCropRect(sourceWidth: Int, sourceHeight: Int, destinationWidth: Int, destinationHeight: Int): FxRect {
-        val sourceAspect = sourceWidth.toFloat() / sourceHeight
-        val destinationAspect = destinationWidth.toFloat() / destinationHeight
-        return if (sourceAspect > destinationAspect) {
-            val visibleWidth = destinationAspect / sourceAspect
-            val left = (1f - visibleWidth) * 0.5f
-            FxRect(left, 0f, left + visibleWidth, 1f)
-        } else {
-            val visibleHeight = sourceAspect / destinationAspect
-            val bottom = (1f - visibleHeight) * 0.5f
-            FxRect(0f, bottom, 1f, bottom + visibleHeight)
-        }
     }
 
     private class EglSession private constructor(

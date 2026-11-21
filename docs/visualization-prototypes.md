@@ -58,9 +58,12 @@ libinfinifx.
 ### Artwork and metadata composition
 
 The album-art ImageView and the FX frame both use center-crop geometry, so the
-art fills the entire visual pane while retaining its aspect ratio. The crop is
-also passed in FxFrameInput.geometry.contentRect; graph output and source
-presentation therefore show the same region.
+art fills the entire visual pane while retaining its aspect ratio. For a square
+image on a 16:9 pane, fitting the image to pane width places its centered top at
+Y = -7/32 pane-width; the visible source crop removes 7/32 from both vertical
+edges. This crop is passed in FxFrameInput.geometry.contentRect, so graph output
+and source presentation show the same centered region. ArtworkCropGeometryTest
+locks this mapping.
 
 The MTV-style title/details label is a player-owned child overlay outside the FX
 graph. It is brought above the GPU artwork and spectrum layers and does not
