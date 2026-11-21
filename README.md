@@ -13,16 +13,18 @@ Reusable decoding, synthesis and timing belong to libinfinisound/libinfinivideo.
 The media pane runs libinfinifx over album art and static images. Artwork fills
 the pane with a centered crop by default. Square art on a 16:9 pane is fitted to
 pane width; its Y begins 7/32 of the pane width above the top edge, cropping
-7/32 from each vertical edge. Each image graph starts with a fixed
-album-art rotozoom stage, then runs two temporary randomized effect stages, and
-finishes with a full-width lightning-spectrum layer. The MTV-style metadata
+7/32 from each vertical edge. Each image graph starts with tempo-smoothed,
+bounded album-art rotozoom, then runs two temporary randomized effect stages,
+and finishes with a lightning-spectrum layer centered at 90% width by default.
+The MTV-style metadata
 label is player UI outside the graph, so it never consumes or reduces the
 effects' render area; it stays above the artwork, FX output, and spectrum.
 
-Rotozoom rotates at its configured base rate for 120 BPM and scales that rate
-from the estimated track tempo (bounded to 0.5x–2x). Low-band transient events
-also pulse its zoom and rotation. Tempo and transient estimates come from
-libinfinisound's existing PCM/spectrum analysis; no second decoder is added.
+Rotozoom rotates at its configured base rate for 120 BPM and smoothly scales
+that rate from estimated track tempo (0.5x–2x); its angular speed is clamped to
+±4 rad/s. Low-band transient events also smoothly pulse zoom and rotation.
+Tempo and transient estimates come from libinfinisound's existing PCM/spectrum
+analysis; no second decoder is added.
 The label background is about 15% opaque black. On audio tracks longer than 22
 seconds it holds for 10 seconds, fades out over 1 second, then fades back in
 over 1 second starting 11 seconds before the end. Short tracks keep it visible
@@ -34,8 +36,9 @@ The randomized stages currently choose CRT, handheld LCD, water refraction,
 heat ripple, kaleidoscope, or a fire generator with explicit alpha composition.
 This temporary policy changes one stage when the visual playlist item changes;
 there is no effect picker yet. The spectrum generator maps the normalized 16 PCM
-bands to colored electric bars. Its full-width segmented fallback is anchored
-at the pane's bottom edge until the first GPU frame swaps successfully, and
+bands to centered colored electric bars (90% output width by default; a zero
+band has zero height). Its full-width segmented fallback is anchored at the
+pane's bottom edge until the first GPU frame swaps successfully, and
 returns if the graph cannot render. Tap the
 visual pane to reveal EDIT FX beside the full-screen button.
 
@@ -238,3 +241,15 @@ ANDROID_HOME="$HOME/android-sdk" ./build.sh --no-daemon --max-workers=1 --consol
 The debug APK assembled and all 118 JVM unit tests passed, including the two
 random-pipeline and audio-metadata adapter checks. This is not device visual or
 GLES performance acceptance; see [visualization integration status](docs/visualization-prototypes.md).
+
+
+## InfiniFX display and motion follow-up — 2026-11-21
+
+The graph-width slider defaults to 90% and keeps the lightning bars centered.
+Present zero-valued frequency bands have zero height; the idle baseline applies
+only when band data is missing. Rotozoom smooths tempo and audio modulation,
+integrates a continuous rotation phase, and clamps its rate to ±4 rad/s.
+The library update is pinned at `ea06a83ed1202b5c73e69bc1497270a8eb2e1fe7`.
+The standalone app build passed 129 viewer-audio tests and assembled the debug
+APK. Device visual and performance acceptance remain outstanding; see
+[visualization status](docs/visualization-prototypes.md).

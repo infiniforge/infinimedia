@@ -75,6 +75,7 @@ internal class RandomFxPipeline(private val random: Random = Random.Default) {
             parameters = mapOf(
                 "gain" to FxParameterValue.FloatValue(lightningStyle.gain),
                 "maxHeight" to FxParameterValue.FloatValue(lightningStyle.maxHeight),
+                "widthScale" to FxParameterValue.FloatValue(lightningStyle.widthScale),
                 "barGap" to FxParameterValue.FloatValue(lightningStyle.barGap),
                 "glow" to FxParameterValue.FloatValue(lightningStyle.glow),
                 "idleHeight" to FxParameterValue.FloatValue(lightningStyle.idleHeight),
@@ -98,6 +99,7 @@ internal class RandomFxPipeline(private val random: Random = Random.Default) {
 internal data class LightningSpectrumStyle(
     val gain: Float = 2.6f,
     val maxHeight: Float = .88f,
+    val widthScale: Float = .9f,
     val barGap: Float = .14f,
     val glow: Float = .9f,
     val idleHeight: Float = .14f,

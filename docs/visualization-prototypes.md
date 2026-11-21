@@ -33,16 +33,17 @@ artwork can sit between the underlying album-art ImageView and the existing
 title/spectrum overlays. The spectrum fallback is hidden only after the first
 successful `eglSwapBuffers`. This replaces a SurfaceView configured as a media
 overlay, whose special surface z-order could place it behind ordinary content
-in the host window ([Android SurfaceView documentation](https://developer.android.com/reference/android/view/SurfaceView)). If a randomized effect graph fails, the host retries the lightning generator alone through libinfinifx and logs the original error. The original artwork remains visible underneath the transparent output; the full-width spectrum prototype stays available until a rendered frame has successfully swapped and returns if the lightning-only graph also fails.
+in the host window ([Android SurfaceView documentation](https://developer.android.com/reference/android/view/SurfaceView)). If a randomized effect graph fails, the host retries the lightning generator alone through libinfinifx and logs the original error. The original artwork remains visible underneath the transparent output; the full-width segmented spectrum fallback stays available until a rendered frame has successfully swapped and returns if the lightning-only graph also fails.
 
-The RandomFxPipeline begins every artwork graph with the fixed
-distort:rotozoom node, then holds two sequential randomized image-effect stages.
+The RandomFxPipeline begins every artwork graph with tempo-smoothed, bounded
+distort:rotozoom motion, then holds two sequential randomized image-effect stages.
 On each changed visual playlist item it chooses one randomized stage and
 replaces it with a different available effect ID. The final graph adds an
 independent generator:lightning-spectrum branch and alpha-blends it over the
-processed artwork. Its 16 colored electric bars span the entire output width
-and use the current normalized audio bands; with missing/silent bands, a low
-autonomous baseline remains visible. The segmented prototype is also full-width
+processed artwork. Its 16 colored electric bars are centered in 90% of the output
+width by default and use the current normalized audio bands. Present zero-valued
+bands have zero height; the low autonomous baseline is used only when band data
+is missing. The segmented prototype is also full-width
 and keeps a quiet baseline while acting as the first-frame or error fallback.
 The randomized options are CRT, LCD, water refraction, heat ripple, kaleidoscope,
 and the independent fire generator followed by an explicit alpha blend. This is
@@ -50,7 +51,7 @@ temporary testing behavior, not a selection UI; deliberate user/app selection
 can later replace this policy while retaining the public graph/effect
 contracts. Tapping the visual pane reveals EDIT FX beside the full-screen button
 for the same four-second overlay window. It adjusts gain, maximum height,
-spacing, glow, and idle baseline, applying changes to the active graph as the
+width (default 90%), spacing, glow, and idle baseline, applying changes to the active graph as the
 sliders move. Renderer status, band levels, and errors are recorded in the app
 DiagnosticLog under audio.fx.*. Effect IDs and parameter schemas come from
 libinfinifx.
@@ -186,3 +187,22 @@ PASS: ANDROID_HOME="$HOME/android-sdk" ./build.sh --no-daemon --max-workers=1 --
 completed and assembled InfiniMedia-debug.apk. The viewer-audio JVM suite
 reported 129 tests, 0 failures. adb devices -l reports no attached device;
 metadata appearance and GLES layer visibility remain not verified on device.
+
+
+### Centered spectrum and smoothed rotozoom — 2026-11-21
+
+`dependencies.lock.json` pins libinfinifx commit
+`ea06a83ed1202b5c73e69bc1497270a8eb2e1fe7`. The lightning generator is centered
+at 90% output width by default; the editor exposes that width, and present
+zero-valued audio bands produce zero-height bars. Missing band data can still
+use the idle baseline. Rotozoom smooths BPM over 0.9 seconds, smooths RMS/onset
+modulation over 0.18 seconds, integrates phase continuously, and caps speed at
+±4 rad/s.
+
+PASS: `./build.sh --max-workers=1 --console=plain` completed after resolving the
+pinned source dependencies, assembled `InfiniMedia-debug.apk`, and passed all
+129 viewer-audio JVM tests (0 failures). `adb devices -l` reports no connected
+device. Shader-driver compilation, zero-band pixels, visual width, and runtime
+rotozoom smoothness remain **not verified on device**. The library checkout
+separately passed its portable/GLES tests, AAR/sample build, and 12-stage GLSL
+syntax validation at this commit.

@@ -24,7 +24,7 @@ internal class LightningSpectrumEditor(
             setPadding(dp(20), dp(4), dp(20), dp(4))
         }
         content.addView(TextView(context).apply {
-            text = "Sixteen lightning columns span the artwork pane. Drag the controls to update the active InfiniFX graph."
+            text = "Lightning bars are centered with a small edge margin. Zero-valued bands have zero height."
             textSize = 12f
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             bottomMargin = dp(10)
@@ -66,6 +66,7 @@ internal class LightningSpectrumEditor(
         fun number(value: Float) = String.format(Locale.US, "%.2f", value)
         addSlider("Spectrum gain", 0f, 5f, style.gain, ::number) { current, value -> current.copy(gain = value) }
         addSlider("Maximum height", .1f, 1f, style.maxHeight, { "${(it * 100).toInt()}%" }) { current, value -> current.copy(maxHeight = value) }
+        addSlider("Graph width", .5f, 1f, style.widthScale, { "${(it * 100).toInt()}%" }) { current, value -> current.copy(widthScale = value) }
         addSlider("Bar spacing", 0f, .4f, style.barGap, ::number) { current, value -> current.copy(barGap = value) }
         addSlider("Electric glow", 0f, 2f, style.glow, ::number) { current, value -> current.copy(glow = value) }
         addSlider("Idle baseline", 0f, .2f, style.idleHeight, ::number) { current, value -> current.copy(idleHeight = value) }
