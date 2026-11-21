@@ -56,6 +56,11 @@ sliders move. Renderer status, band levels, and errors are recorded in the app
 DiagnosticLog under audio.fx.*. Effect IDs and parameter schemas come from
 libinfinifx.
 
+Fullscreen visual mode stays active when the current song changes to another
+queue item. It exits when the queue is cleared or the user leaves fullscreen.
+The selected track's artwork and metadata update inside the retained fullscreen
+host.
+
 ### Artwork and metadata composition
 
 The album-art ImageView and the FX frame both use center-crop geometry, so the

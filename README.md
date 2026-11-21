@@ -19,6 +19,8 @@ and finishes with a lightning-spectrum layer centered at 90% width by default.
 The MTV-style metadata
 label is player UI outside the graph, so it never consumes or reduces the
 effects' render area; it stays above the artwork, FX output, and spectrum.
+Fullscreen stays active while the queue advances between songs and ends when the
+user exits fullscreen or clears the queue.
 
 Rotozoom rotates at its configured base rate for 120 BPM and smoothly scales
 that rate from estimated track tempo (0.5x–2x); its angular speed is clamped to

@@ -4761,7 +4761,9 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
     override fun onTrackChanged(track: AudioTrack?, index: Int, total: Int) {
         runOnUiThread {
             refreshDockedEqualizer()
-            if (isLandscapeVideoFullscreen && track?.mediaKind != PlaylistMediaKind.VIDEO) {
+            // Keep the visual pane fullscreen as the queue advances across songs.
+            // A cleared queue is the only track-change event that ends this mode.
+            if (isLandscapeVideoFullscreen && track == null) {
                 exitLandscapeVideoFullscreen()
             }
             selectedPlaylistIndex = index.takeIf { it in 0 until total } ?: -1
