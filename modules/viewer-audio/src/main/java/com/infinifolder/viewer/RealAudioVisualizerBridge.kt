@@ -3,6 +3,7 @@ package com.infinifolder.viewer
 import android.os.Handler
 import android.os.Looper
 import com.infinifolder.audio.analysis.AudioSignalAnalysis
+import com.infinifolder.audio.analysis.AudioTempoEstimator
 import com.infinifolder.audio.AudioAnalysisSession
 import com.infinifolder.audio.AudioProcessing
 import kotlin.math.max
@@ -15,6 +16,9 @@ class RealAudioVisualizerBridge(
     private var analyzer: AudioAnalysisSession? = null
     private var sourceId: Long = -1
     private var generation = 0L
+    private val tempoEstimator = AudioTempoEstimator()
+    @Volatile private var tempoBpm: Float? = null
+    @Volatile private var latestTempoOnset: org.infiniforge.fx.api.FxAudioEvent? = null
     @Volatile var hasStereoVu: Boolean = false
         private set
 
@@ -48,6 +52,17 @@ class RealAudioVisualizerBridge(
             synchronized(this) {
                 if (generation != thisGeneration) return@samples
                 val levels = AudioSignalAnalysis.pcm(samples, channels, rate, waveformPoints, rawBands)
+                val (_, positionMs) = playback()
+                val tempo = tempoEstimator.update(positionMs, rawBands)
+                tempoBpm = tempo.bpm
+                val onsetId = tempo.onsetSequence
+                if (onsetId != null) {
+                    latestTempoOnset = org.infiniforge.fx.api.FxAudioEvent(
+                        id = onsetId,
+                        timestampNanos = System.nanoTime().coerceAtLeast(0L),
+                        strength = tempo.onsetStrength,
+                    )
+                }
                 hasStereoVu = levels.stereo
                 vuLeft = (levels.left.rms * 1.8f).coerceIn(0f, 1f)
                 vuRight = (levels.right.rms * 1.8f).coerceIn(0f, 1f)
@@ -73,10 +88,18 @@ class RealAudioVisualizerBridge(
         reset()
     }
 
+    fun getTempoBpm(): Float? = tempoBpm
+
+    fun getRecentTempoOnset(nowNanos: Long = System.nanoTime()): org.infiniforge.fx.api.FxAudioEvent? =
+        latestTempoOnset?.takeIf { nowNanos >= it.timestampNanos && nowNanos - it.timestampNanos <= 450_000_000L }
+
     @Synchronized
     fun reset() {
         rawBands.fill(0f); smoothBands.fill(0f); peakBands.fill(0f); peakFallSpeed.fill(0f)
         waveformPoints.fill(0f)
+        tempoEstimator.reset()
+        tempoBpm = null
+        latestTempoOnset = null
         vuLeft = 0f; vuRight = 0f; peakVuLeft = 0f; peakVuRight = 0f
         hasStereoVu = false
     }

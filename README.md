@@ -10,22 +10,38 @@ Reusable decoding, synthesis and timing belong to libinfinisound/libinfinivideo.
 
 ## Visualization pipeline
 
-The player retains its existing PCM-driven 16-band spectrum prototype and the classic Winamp spectrum, oscilloscope, and VU views. The media pane now also uses the standalone [libinfinifx](https://github.com/infiniforge/libinfinifx) GLES 3 library as a two-stage effect graph over audio artwork, static images, and a generated fallback image when a track has no art. Each distinct playlist visual item currently replaces one randomly selected pipeline stage with a different random effect. This temporary selection policy is isolated in `RandomFxPipeline` and is intended to be replaced by deliberate selection later; it adds no effect-picker UI.
+The media pane runs libinfinifx over album art and static images. Artwork fills
+the pane with a center crop by default. Each image graph starts with a fixed
+album-art rotozoom stage, then runs two temporary randomized effect stages, and
+finishes with a full-width lightning-spectrum layer. The MTV-style metadata
+label is player UI outside the graph, so it never consumes or reduces the
+effects' render area; it stays above the artwork, FX output, and spectrum.
 
-Available random stages are CRT, handheld LCD, water refraction, heat ripple, album-art rotozoom, kaleidoscope, and the fire generator with explicit alpha composition. Every audio-artwork graph now adds a full-width lightning-spectrum generator as a separate alpha-composited layer; it maps the current normalized 16 PCM bands to animated colored electric bars. The full-width spectrum prototype remains visible until an InfiniFX frame has successfully swapped to the TextureView surface, and returns if rendering fails. If a randomized filter graph fails, Infinimedia retries a lightning-only graph through libinfinifx. Tap the visual pane to reveal **EDIT FX** beside the full-screen button; it opens a live editor for gain, height, bar spacing, glow, and idle baseline (14% by default so silent analyzer snapshots still show the columns). The existing PCM analyzer remains in libinfinisound; its smoothed bands and VU values are adapted to optional normalized FX metadata. Rotozoom responds continuously to RMS and bass energy; host-supplied timestamped onset/beat events add a short zoom and rotation pulse. Infinimedia's current adapter maps levels only and does not invent a second beat detector. Animated image, video, ANSI, and ANSI Music continue on their existing presentation paths; the current library backend does not accept video's external OES texture.
+Rotozoom rotates at its configured base rate for 120 BPM and scales that rate
+from the estimated track tempo (bounded to 0.5x–2x). Low-band transient events
+also pulse its zoom and rotation. Tempo and transient estimates come from
+libinfinisound's existing PCM/spectrum analysis; no second decoder is added.
+The label background is about 10% opaque black. On audio tracks longer than 22
+seconds it holds for 10 seconds, fades out over 1 second, then fades back in
+over 1 second starting 11 seconds before the end. Short tracks keep it visible
+throughout; tracks without a known duration fade it out after 10 seconds and
+cannot schedule the end fade-in. Seeking uses playback position to restore the
+matching opacity.
 
-The earlier shared-field heat/smoke/wind/lightning app overlay remains removed. The retained spectrum, oscilloscope, and VU views remain prototypes; the audio-artwork pane uses a full-width segmented-spectrum fallback until its GPU graph presents successfully. The TextureView-backed GPU output, lightning-spectrum graph, and small parameter editor are source-implemented but have not yet been device-verified in this checkout. See [visualization integration status](docs/visualization-prototypes.md) and [architecture](docs/architecture.md).
+The randomized stages currently choose CRT, handheld LCD, water refraction,
+heat ripple, kaleidoscope, or a fire generator with explicit alpha composition.
+This temporary policy changes one stage when the visual playlist item changes;
+there is no effect picker yet. The spectrum generator maps the normalized 16 PCM
+bands to colored electric bars. Its full-width fallback remains until the first
+GPU frame swaps successfully, and returns if the graph cannot render. Tap the
+visual pane to reveal EDIT FX beside the full-screen button.
 
-External storage is selected through libinfiniselect. Infinifolder adds advanced
-storage when installed; Android SAF remains available on its own. The APK does
-not include Infinifolder's remote clients, torrent engine or virtual filesystem
-implementation. The small shared UI and resource-support libraries adapt content
-URIs without depending on another application's source.
-
-See [InfiniMedia architecture](docs/architecture.md), [storage integration](docs/storage.md),
-and the [documentation index](docs/README.md) for the app-owned boundaries and
-format guides. InfiniFolder is an optional provider companion; the keyboard app
-is not part of this storage integration.
+Animated image, video, ANSI, and ANSI Music continue on their existing
+presentation paths. The GLES 3 backend accepts 2D textures; video currently
+uses an external OES texture and has not been adapted. GPU appearance,
+orientation, timing and performance still need device verification in this
+checkout. See [visualization integration status](docs/visualization-prototypes.md)
+and [architecture](docs/architecture.md).
 
 ## Storage identities and playlists
 

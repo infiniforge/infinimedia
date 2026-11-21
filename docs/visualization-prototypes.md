@@ -34,34 +34,52 @@ successful `eglSwapBuffers`. This replaces a SurfaceView configured as a media
 overlay, whose special surface z-order could place it behind ordinary content
 in the host window ([Android SurfaceView documentation](https://developer.android.com/reference/android/view/SurfaceView)). If a randomized effect graph fails, the host retries the lightning generator alone through libinfinifx and logs the original error. The original artwork remains visible underneath the transparent output; the full-width spectrum prototype stays available until a rendered frame has successfully swapped and returns if the lightning-only graph also fails.
 
-`RandomFxPipeline` currently holds two sequential image-effect stages. On each
-changed visual playlist item it chooses one stage at random and replaces it with
-a different available effect ID. Each graph then adds an independent
-`generator:lightning-spectrum` branch and alpha-blends it over the processed
-artwork. Its 16 colored electric bars span the entire output width and use the
-current normalized audio bands; with missing/silent bands, a low autonomous
-baseline remains visible. The segmented prototype is also full-width and keeps a
-quiet baseline while acting as the first-frame or error fallback. The options are CRT, LCD, water refraction, heat ripple, album-art rotozoom,
-kaleidoscope, and the independent fire generator
-followed by an explicit alpha blend. This is temporary testing behavior, not a
-selection UI; deliberate user/app selection can later replace this policy while
-retaining the public graph/effect contracts. Tapping the visual pane reveals
-**EDIT FX** beside the full-screen button for the same four-second overlay
-window. It adjusts gain, maximum height, spacing, glow, and idle baseline,
-applying changes to the active graph as the sliders move. The editor starts with a 14% autonomous height floor so the bars remain visible with a silent or missing band
-snapshot. Renderer status, band levels, and errors are recorded in the app's
-`DiagnosticLog` under `audio.fx.*`. Effect IDs and parameter schemas come from
+The RandomFxPipeline begins every artwork graph with the fixed
+distort:rotozoom node, then holds two sequential randomized image-effect stages.
+On each changed visual playlist item it chooses one randomized stage and
+replaces it with a different available effect ID. The final graph adds an
+independent generator:lightning-spectrum branch and alpha-blends it over the
+processed artwork. Its 16 colored electric bars span the entire output width
+and use the current normalized audio bands; with missing/silent bands, a low
+autonomous baseline remains visible. The segmented prototype is also full-width
+and keeps a quiet baseline while acting as the first-frame or error fallback.
+The randomized options are CRT, LCD, water refraction, heat ripple, kaleidoscope,
+and the independent fire generator followed by an explicit alpha blend. This is
+temporary testing behavior, not a selection UI; deliberate user/app selection
+can later replace this policy while retaining the public graph/effect
+contracts. Tapping the visual pane reveals EDIT FX beside the full-screen button
+for the same four-second overlay window. It adjusts gain, maximum height,
+spacing, glow, and idle baseline, applying changes to the active graph as the
+sliders move. Renderer status, band levels, and errors are recorded in the app
+DiagnosticLog under audio.fx.*. Effect IDs and parameter schemas come from
 libinfinifx.
 
+### Artwork and metadata composition
+
+The album-art ImageView and the FX frame both use center-crop geometry, so the
+art fills the entire visual pane while retaining its aspect ratio. The crop is
+also passed in FxFrameInput.geometry.contentRect; graph output and source
+presentation therefore show the same region.
+
+The MTV-style title/details label is a player-owned child overlay outside the FX
+graph. It is brought above the GPU artwork and spectrum layers and does not
+shrink the graph's full-pane viewport. Its black background is approximately
+10% opaque. For audio with a known duration longer than 22 seconds, it remains
+visible through 10 seconds, fades out during seconds 10–11, and fades in during
+the final 11–10 seconds. A backward seek recomputes opacity from playhead time.
+Short tracks keep the label visible because the hide and end-fade windows would
+overlap. With unknown duration it fades out after 10 seconds and stays hidden.
+
 The host maps the existing smoothed 16 spectrum bands to normalized low/mid/high
-energy and uses the existing VU RMS/peak values. It does not decode audio again
-or generate onset events. Rotozoom responds continuously to RMS/bass energy; a
-host-supplied timestamped onset/beat event adds a short zoom and rotation pulse.
-The library consumes each stable event ID once. Infinimedia's current analyzer
-adapter supplies levels only, so beat-triggered pulses are ready at the library
-boundary but are not yet driven by this app. Missing or stale audio metadata
-leaves autonomous effects animated and audio-only modulation at its neutral
-value.
+energy and uses the existing VU RMS/peak values. libinfinisound estimates tempo
+from the low-band envelope and emits uniquely numbered low-band transient
+events through the same analysis stream. Rotozoom scales its base rotation rate
+relative to 120 BPM, clamped to 0.5x–2x; transient events pulse zoom and
+rotation. This lightweight estimate is not a beat-grid or musical downbeat
+detector. The adapter maps event IDs and timestamps into FxAudioEvent, whose
+per-node cursor prevents replay when a metadata snapshot is reused. Missing or
+stale audio metadata leaves autonomous effects animated and audio-only
+modulation at its neutral value.
 
 FX currently runs for audio artwork and static image bitmaps. Video remains on
 its existing playback renderer because its current output uses
@@ -109,3 +127,21 @@ this build is not visual device acceptance. The supplied prior diagnostic bundle
 contains no `audio.fx.*` render records; the current build records source size,
 surface availability/destruction, skipped render inputs, errors, and successful
 swaps to make the next capture actionable.
+
+### Latest build checkpoint — 2026-11-21
+
+With libinfinisound commit 095c4216ee71257779f7b4f31749cf57f4e2f583 and
+libinfinifx commit d48be61714fc4fa231d3eb48df9d56dd7a6869ff pinned in
+`dependencies.lock.json`, `./build.sh --max-workers=1 --console=plain`
+completed successfully. It built `InfiniMedia-debug.apk` and passed all 123
+viewer-audio JVM tests, including the graph-stage, audio metadata adapter, and
+metadata fade tests. In the standalone libinfinisound checkout,
+`./gradlew :audio-core:test --no-daemon --max-workers=1 --console=plain`
+passed, including synthetic 120 BPM pulse and transient-ID coverage. The
+libinfinifx `:fx-core:test` task passed, and the app build compiled its GLES
+module with the BPM-aware rotozoom runtime.
+
+These are compiler and portable test results. `adb devices -l` listed no
+attached device during this checkpoint, so album-art cropping, layer order,
+rotozoom tempo behavior, label fade appearance, shader output, and frame timing
+remain **not verified on device**.

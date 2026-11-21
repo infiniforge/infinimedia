@@ -13,7 +13,6 @@ internal class RandomFxPipeline(private val random: Random = Random.Default) {
         "display:lcd",
         "distort:water-refraction",
         "distort:heat-ripple",
-        "distort:rotozoom",
         "distort:kaleidoscope",
         "generator:fire",
     )
@@ -48,7 +47,10 @@ internal class RandomFxPipeline(private val random: Random = Random.Default) {
     fun graph(): FxGraph {
         val nodes = mutableListOf<FxNode>()
         val connections = mutableListOf<FxConnection>()
-        var current = FxGraph.SOURCE_NODE_ID
+        val rotozoom = "artwork_rotozoom"
+        nodes += FxNode(rotozoom, "distort:rotozoom")
+        connections += FxConnection(FxGraph.SOURCE_NODE_ID, rotozoom, "image")
+        var current = rotozoom
         stages.forEachIndexed { index, effectId ->
             if (effectId == "generator:fire") {
                 val generator = "stage_${index}_generator"

@@ -17,9 +17,12 @@ or Infiniscribe as Gradle projects and does not import their application source.
   prototypes and hosts a `libinfinifx` graph over audio artwork/static images.
   Its TextureView-backed `FxArtworkView` owns an EGL/GLES render thread and bitmap
   texture lifecycle, preserving normal Android child-view composition.
-  `RandomFxPipeline` temporarily replaces one of two effect stages randomly per
-  changed visual item, then alpha-composites the full-width lightning-spectrum
-  generator as a separate output layer. The app owns a small live parameter editor.
+  RandomFxPipeline fixes rotozoom as the first artwork stage, randomly replaces
+  one of two following effect stages per changed visual item, then
+  alpha-composites the full-width lightning-spectrum generator. A player-owned
+  metadata label sits above the full-pane effect stack. libinfinisound supplies
+  estimated tempo and low-band transient events through the existing PCM
+  analyzer. The app owns a small live parameter editor and metadata fade schedule.
 - `libinfinifx` owns the public graph/effect API, GLES executor, shaders, and
   per-node state. Its Infinimedia adapter is app-owned and does not import this app.
 - `libinfinisound`, `libinfinivideo`, `libinfiniselect`, and `libinfiniui` own

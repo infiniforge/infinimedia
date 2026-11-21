@@ -31,7 +31,6 @@ import org.infiniforge.fx.api.FxTexture
 import org.infiniforge.fx.gles.GlesFxEngine
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import kotlin.math.min
 
 /**
  * TextureView-backed GLES output. It participates in normal Android view ordering,
@@ -296,7 +295,7 @@ internal class FxArtworkView @JvmOverloads constructor(
             val delta = if (lastFrameNanos == 0L) 0f else
                 ((now - lastFrameNanos).coerceAtLeast(0L) / 1_000_000_000f).coerceIn(0f, 0.1f)
             lastFrameNanos = now
-            val displayRect = fitCenter(bitmap.width, bitmap.height, width, height)
+            val sourceCrop = centerCropRect(bitmap.width, bitmap.height, width, height)
             val frame = FxFrameInput(
                 presentationTimeNanos = now,
                 deltaTimeSeconds = delta,
@@ -306,7 +305,8 @@ internal class FxArtworkView @JvmOverloads constructor(
                     sourceHeight = bitmap.height,
                     destinationWidth = width,
                     destinationHeight = height,
-                    displayRect = displayRect,
+                    contentRect = sourceCrop,
+                    displayRect = FxRect(0f, 0f, 1f, 1f),
                 ),
                 sourceTexture = FxTexture(
                     name = current.sourceTextureName,
@@ -414,13 +414,18 @@ internal class FxArtworkView @JvmOverloads constructor(
         post { onRenderAvailabilityChanged?.invoke(available) }
     }
 
-    private fun fitCenter(sourceWidth: Int, sourceHeight: Int, destinationWidth: Int, destinationHeight: Int): FxRect {
-        val scale = min(destinationWidth.toFloat() / sourceWidth, destinationHeight.toFloat() / sourceHeight)
-        val width = sourceWidth * scale / destinationWidth
-        val height = sourceHeight * scale / destinationHeight
-        val left = (1f - width) * 0.5f
-        val bottom = (1f - height) * 0.5f
-        return FxRect(left, bottom, left + width, bottom + height)
+    private fun centerCropRect(sourceWidth: Int, sourceHeight: Int, destinationWidth: Int, destinationHeight: Int): FxRect {
+        val sourceAspect = sourceWidth.toFloat() / sourceHeight
+        val destinationAspect = destinationWidth.toFloat() / destinationHeight
+        return if (sourceAspect > destinationAspect) {
+            val visibleWidth = destinationAspect / sourceAspect
+            val left = (1f - visibleWidth) * 0.5f
+            FxRect(left, 0f, left + visibleWidth, 1f)
+        } else {
+            val visibleHeight = sourceAspect / destinationAspect
+            val bottom = (1f - visibleHeight) * 0.5f
+            FxRect(0f, bottom, 1f, bottom + visibleHeight)
+        }
     }
 
     private class EglSession private constructor(

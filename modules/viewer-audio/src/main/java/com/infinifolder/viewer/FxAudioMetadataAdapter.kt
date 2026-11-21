@@ -1,12 +1,13 @@
 package com.infinifolder.viewer
 
 import org.infiniforge.fx.api.AudioFrameMetadata
+import org.infiniforge.fx.api.FxAudioEvent
 import kotlin.math.max
 import kotlin.math.sqrt
 
 /** Adapts the already-normalized visualizer bridge output; it performs no audio analysis. */
 internal object FxAudioMetadataAdapter {
-    fun snapshot(bands: FloatArray, vu: FloatArray, timestampNanos: Long): AudioFrameMetadata {
+    fun snapshot(bands: FloatArray, vu: FloatArray, timestampNanos: Long, bpm: Float? = null, onset: FxAudioEvent? = null): AudioFrameMetadata {
         val normalizedBands = bands.map { finiteUnit(it) }
         val low = average(normalizedBands, 0, 4)
         val mid = average(normalizedBands, 4, 10)
@@ -23,6 +24,8 @@ internal object FxAudioMetadataAdapter {
             lowEnergy = low,
             midEnergy = mid,
             highEnergy = high,
+            bpm = bpm,
+            onsetEvents = onset?.let(::listOf).orEmpty(),
         )
     }
 

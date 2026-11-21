@@ -2,6 +2,7 @@ package com.infinifolder.viewer
 
 import org.infiniforge.fx.api.BuiltinFx
 import org.infiniforge.fx.api.FxGraphValidator
+import org.infiniforge.fx.api.FxGraph
 import kotlin.random.Random
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -21,6 +22,8 @@ class FxPipelineTest {
             assertTrue(before.indices.filter { it != change.slot }.all { before[it] == after[it] })
             val graph = pipeline.graph()
             FxGraphValidator.validate(graph, BuiltinFx.byId)
+            assertEquals("distort:rotozoom", graph.nodes.single { it.id == "artwork_rotozoom" }.effectId)
+            assertTrue(graph.connections.any { it.fromNodeId == FxGraph.SOURCE_NODE_ID && it.toNodeId == "artwork_rotozoom" })
             assertEquals("generator:lightning-spectrum", graph.nodes.single { it.id == "lightning_spectrum" }.effectId)
             assertTrue(graph.connections.any { it.fromNodeId == "lightning_spectrum" && it.inputPort == "overlay" })
         }
@@ -54,13 +57,16 @@ class FxPipelineTest {
             bands = FloatArray(16) { it / 15f },
             vu = floatArrayOf(.3f, .4f, .8f, .6f),
             timestampNanos = 123L,
+            bpm = 127f,
+            onset = org.infiniforge.fx.api.FxAudioEvent(id = 3L, timestampNanos = 120L, strength = .7f),
         )
         assertEquals(123L, metadata.timestampNanos)
+        assertEquals(127f, metadata.bpm!!, .0001f)
+        assertEquals(3L, metadata.onsetEvents.single().id)
         assertEquals(kotlin.math.sqrt(.125f), metadata.rms, .0001f)
         assertEquals(.8f, metadata.peak, .0001f)
         assertEquals((0f + 1f / 15f + 2f / 15f + 3f / 15f) / 4f, metadata.lowEnergy, .0001f)
         assertEquals(((4f + 5f + 6f + 7f + 8f + 9f) / 15f) / 6f, metadata.midEnergy, .0001f)
         assertEquals(12.5f / 15f, metadata.highEnergy, .0001f)
-        assertTrue(metadata.onsetEvents.isEmpty())
     }
 }

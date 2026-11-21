@@ -1672,7 +1672,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
         artCard.addView(ansiTerminalView)
 
         albumArtView = ImageView(this).apply {
-            scaleType = ImageView.ScaleType.FIT_CENTER
+            scaleType = ImageView.ScaleType.CENTER_CROP
             layoutParams = FrameLayout.LayoutParams(-1, -1)
             contentDescription = "Visual media"
             setOnClickListener { showFullscreenVideoButton() }
@@ -1691,7 +1691,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
             setPadding(dp(9), dp(6), dp(9), dp(6))
             background = GradientDrawable().apply {
                 cornerRadius = dp(6).toFloat()
-                setColor(0xC9000000.toInt())
+                setColor(0x1A000000.toInt())
             }
         }
         visualPaneTitleText = TextView(this).apply {
@@ -1724,6 +1724,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
         artCard.addView(visualPaneVisualizerView, FrameLayout.LayoutParams(-1, dp(52), Gravity.BOTTOM).apply {
             bottomMargin = dp(68)
         })
+        visualPaneMetadata.bringToFront()
         fxArtworkView.onRenderAvailabilityChanged = { available ->
             fxRenderAvailable = available
             val isAudioPane = AudioPlayerService.currentService?.currentTrack?.mediaKind == PlaylistMediaKind.AUDIO && !isShowingAnsiOverlay
@@ -2029,7 +2030,11 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
                     val vu = FloatArray(4)
                     visualizerBridge?.getVuLevels(vu, isPlaying = true)
                     fxArtworkView.setAudioMetadata(
-                        FxAudioMetadataAdapter.snapshot(visualizerBands.copyOf(), vu, System.nanoTime().coerceAtLeast(0L))
+                        FxAudioMetadataAdapter.snapshot(
+                            visualizerBands.copyOf(), vu, System.nanoTime().coerceAtLeast(0L),
+                            bpm = visualizerBridge?.getTempoBpm(),
+                            onset = visualizerBridge?.getRecentTempoOnset(),
+                        )
                     )
                 } else {
                     fxArtworkView.setAudioMetadata(null)
@@ -3793,6 +3798,10 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
         if (::winampMainWindowView.isInitialized) {
             if (winampMainWindowView.currentPositionMs != pos) winampMainWindowView.currentPositionMs = pos
             if (winampMainWindowView.durationMs != dur) winampMainWindowView.durationMs = dur
+        }
+        if (::visualPaneMetadata.isInitialized) {
+            val audioPane = AudioPlayerService.currentService?.currentTrack?.mediaKind == PlaylistMediaKind.AUDIO && !isShowingAnsiOverlay
+            visualPaneMetadata.alpha = if (audioPane) VisualizationMetadataFade.alpha(pos.toLong(), dur.toLong()) else 1f
         }
     }
 
