@@ -1724,7 +1724,6 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
         artCard.addView(visualPaneVisualizerView, FrameLayout.LayoutParams(-1, dp(52), Gravity.BOTTOM).apply {
             bottomMargin = dp(68)
         })
-        visualPaneMetadata.bringToFront()
         fxArtworkView.onRenderAvailabilityChanged = { available ->
             fxRenderAvailable = available
             val isAudioPane = AudioPlayerService.currentService?.currentTrack?.mediaKind == PlaylistMediaKind.AUDIO && !isShowingAnsiOverlay
@@ -1784,6 +1783,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
             topMargin = dp(10)
             rightMargin = dp(154)
         })
+        visualPaneMetadata.bringToFront()
 
         mainColumn.addView(artCard)
         setupDockedVisualWindow()
