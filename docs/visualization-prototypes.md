@@ -9,9 +9,10 @@ reusable effects and graph execution.
 
 - `VisualizerView` remains the segmented 16-band spectrum prototype in the
   player console and classic Winamp modes. In the standard audio-artwork pane,
-  a full-width instance remains visible until an InfiniFX frame successfully
-  swaps to the TextureView surface, and returns if rendering fails. Its quiet
-  baseline stays visible before audio analysis arrives. A randomized graph
+  a full-width instance is anchored to the pane's bottom edge and remains visible
+  until an InfiniFX frame successfully swaps to the TextureView surface, then
+  returns if rendering fails. Its quiet baseline stays visible before audio
+  analysis arrives; the metadata label overlays it at lower left. A randomized graph
   failure retries a minimal lightning-only libinfinifx graph; diagnostics record
   the original error, surface readiness, and successful frame swaps.
 - `WinampMainWindowView` can switch among spectrum, oscilloscope, and VU modes.
@@ -64,7 +65,7 @@ presentation therefore show the same region.
 The MTV-style title/details label is a player-owned child overlay outside the FX
 graph. It is brought above the GPU artwork and spectrum layers and does not
 shrink the graph's full-pane viewport. Its black background is approximately
-10% opaque. For audio with a known duration longer than 22 seconds, it remains
+15% opaque. For audio with a known duration longer than 22 seconds, it remains
 visible through 10 seconds, fades out during seconds 10–11, and fades in during
 the final 11–10 seconds. A backward seek recomputes opacity from playhead time.
 Short tracks keep the label visible because the hide and end-fade windows would

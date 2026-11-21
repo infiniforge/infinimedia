@@ -21,7 +21,7 @@ Rotozoom rotates at its configured base rate for 120 BPM and scales that rate
 from the estimated track tempo (bounded to 0.5x–2x). Low-band transient events
 also pulse its zoom and rotation. Tempo and transient estimates come from
 libinfinisound's existing PCM/spectrum analysis; no second decoder is added.
-The label background is about 10% opaque black. On audio tracks longer than 22
+The label background is about 15% opaque black. On audio tracks longer than 22
 seconds it holds for 10 seconds, fades out over 1 second, then fades back in
 over 1 second starting 11 seconds before the end. Short tracks keep it visible
 throughout; tracks without a known duration fade it out after 10 seconds and
@@ -32,8 +32,9 @@ The randomized stages currently choose CRT, handheld LCD, water refraction,
 heat ripple, kaleidoscope, or a fire generator with explicit alpha composition.
 This temporary policy changes one stage when the visual playlist item changes;
 there is no effect picker yet. The spectrum generator maps the normalized 16 PCM
-bands to colored electric bars. Its full-width fallback remains until the first
-GPU frame swaps successfully, and returns if the graph cannot render. Tap the
+bands to colored electric bars. Its full-width segmented fallback is anchored
+at the pane's bottom edge until the first GPU frame swaps successfully, and
+returns if the graph cannot render. Tap the
 visual pane to reveal EDIT FX beside the full-screen button.
 
 Animated image, video, ANSI, and ANSI Music continue on their existing

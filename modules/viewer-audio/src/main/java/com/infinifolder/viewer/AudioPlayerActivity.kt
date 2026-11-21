@@ -1691,7 +1691,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
             setPadding(dp(9), dp(6), dp(9), dp(6))
             background = GradientDrawable().apply {
                 cornerRadius = dp(6).toFloat()
-                setColor(0x1A000000.toInt())
+                setColor(0x26000000.toInt())
             }
         }
         visualPaneTitleText = TextView(this).apply {
@@ -1722,7 +1722,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
             isPlaying = false
         }
         artCard.addView(visualPaneVisualizerView, FrameLayout.LayoutParams(-1, dp(52), Gravity.BOTTOM).apply {
-            bottomMargin = dp(68)
+            bottomMargin = 0
         })
         fxArtworkView.onRenderAvailabilityChanged = { available ->
             fxRenderAvailable = available
