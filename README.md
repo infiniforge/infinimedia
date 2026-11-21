@@ -15,7 +15,7 @@ the pane with a centered crop by default. Square art on a 16:9 pane is fitted to
 pane width; its Y begins 7/32 of the pane width above the top edge, cropping
 7/32 from each vertical edge. Each image graph starts with tempo-smoothed,
 bounded album-art rotozoom, then runs two temporary randomized effect stages,
-and finishes with a full-width, full-height lightning-spectrum layer. The lightning has no filled bar boxes; its outlined bolts cycle through the eight most popular colors detected from a deterministic six-bit RGB quantization of the artwork.
+and finishes with a full-width, full-height lightning-spectrum layer. Its hairline-antialiased paths use seeded random motion and six thin side tendrils with shorter twigs per trace by default. The lightning has no filled bar boxes; its colors cycle through the eight most popular colors detected from a deterministic six-bit RGB quantization of the artwork.
 The MTV-style metadata
 label is player UI outside the graph, so it never consumes or reduces the
 effects' render area; it stays above the artwork, FX output, and spectrum.
@@ -38,7 +38,7 @@ The randomized stages currently choose CRT, handheld LCD, water refraction,
 heat ripple, kaleidoscope, or a fire generator with explicit alpha composition.
 This temporary policy changes one stage when the visual playlist item changes;
 there is no effect picker yet. The spectrum generator maps the normalized 16 PCM
-bands to outlined electric lightning spanning the full output width and height by default; no filled bar boxes are drawn. Lightning outline colors use the artwork's top detected palette colors; present zero-valued bands have zero height. Its full-width segmented fallback is anchored at the
+bands to thin antialiased electric lightning spanning the full output width and height by default; seeded random paths grow six tendrils and short twigs per trace. No filled bar boxes are drawn. Lightning colors use the artwork's top detected palette colors; present zero-valued bands have zero height. Its full-width segmented fallback is anchored at the
 pane's bottom edge until the first GPU frame swaps successfully, and
 returns if the graph cannot render. Tap the
 visual pane to reveal EDIT FX beside the full-screen button.
@@ -246,8 +246,8 @@ GLES performance acceptance; see [visualization integration status](docs/visuali
 
 ## InfiniFX display and motion follow-up — 2026-11-21
 
-The graph defaults to 100% output width and height with no outer inset. It renders only outlined lightning traces at 20× animation speed with 8× strokes that can overlap; each frequency column uses one of up to eight popular colors from a deterministic 32×32 sample quantized to six-bit RGB, deduplicated by color bin, and ranked by frequency. Present zero-valued frequency bands have zero height; the idle baseline applies only when band data is missing. Rotozoom smooths tempo and audio modulation, integrates a continuous rotation phase, and clamps its rate to ±4 rad/s.
-The library update is pinned at `0d62f0bd132974a61e81e82a52e183150db76dec`.
+The graph defaults to 100% output width and height with no outer inset. It renders only thin, screen-space-antialiased lightning traces at 20× animation speed, with seeded-random spines, six tendrils and shorter twigs per trace by default; each frequency column uses one of up to eight popular colors from a deterministic 32×32 sample quantized to six-bit RGB, deduplicated by color bin, and ranked by frequency. Present zero-valued frequency bands have zero height; the idle baseline applies only when band data is missing. Rotozoom smooths tempo and audio modulation, integrates a continuous rotation phase, and clamps its rate to ±4 rad/s.
+The library update is pinned at `4b0955cec4ced121ab69f5dd06c9006bbccceb5f`.
 The standalone app build passed 133 viewer-audio tests and assembled the debug
 APK. The artwork view resumes its render loop after fullscreen reparenting and
 retries transient EGL failures with bounded backoff. Device visual and

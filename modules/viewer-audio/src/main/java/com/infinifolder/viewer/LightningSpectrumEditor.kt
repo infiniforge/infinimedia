@@ -24,7 +24,7 @@ internal class LightningSpectrumEditor(
             setPadding(dp(20), dp(4), dp(20), dp(4))
         }
         content.addView(TextView(context).apply {
-            text = "Full-width lightning only, colored from the artwork palette. Bolts overlap; zero-valued bands have zero height."
+            text = "Thin antialiased lightning with adjustable side tendrils, colored from the artwork palette. Zero-valued bands have zero height."
             textSize = 12f
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             bottomMargin = dp(10)
@@ -67,7 +67,7 @@ internal class LightningSpectrumEditor(
         addSlider("Spectrum gain", 0f, 5f, style.gain, ::number) { current, value -> current.copy(gain = value) }
         addSlider("Maximum height", .1f, 1f, style.maxHeight, { "${(it * 100).toInt()}%" }) { current, value -> current.copy(maxHeight = value) }
         addSlider("Graph width", .5f, 1f, style.widthScale, { "${(it * 100).toInt()}%" }) { current, value -> current.copy(widthScale = value) }
-        addSlider("Bolt width", 1f, 12f, style.boltWidth, { "${it.toInt()}×" }) { current, value -> current.copy(boltWidth = value) }
+        addSlider("Tendrils per bolt", 1f, 8f, style.branchCount.toFloat(), { it.toInt().toString() }) { current, value -> current.copy(branchCount = value.toInt().coerceIn(1, 8)) }
         addSlider("Lightning speed", 0f, 40f, style.animationSpeed, { "${it.toInt()}×" }) { current, value -> current.copy(animationSpeed = value) }
         addSlider("Electric glow", 0f, 2f, style.glow, ::number) { current, value -> current.copy(glow = value) }
         addSlider("Idle baseline", 0f, .2f, style.idleHeight, ::number) { current, value -> current.copy(idleHeight = value) }

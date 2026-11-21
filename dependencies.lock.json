@@ -11,7 +11,7 @@
     },
     "libinfinifx": {
       "url": "https://github.com/infiniforge/libinfinifx.git",
-      "commit": "0d62f0bd132974a61e81e82a52e183150db76dec"
+      "commit": "4b0955cec4ced121ab69f5dd06c9006bbccceb5f"
     },
     "libinfiniscribe": {
       "url": "https://github.com/infiniforge/libinfiniscribe.git",

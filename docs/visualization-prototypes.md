@@ -218,9 +218,9 @@ syntax validation at this commit.
 
 The current graph defaults to 100% of the image width and height. The lightning
 generator draws outlined electric paths only, with no filled rectangular bars.
-Its procedural lightning evolves at 20× real time, and 8× stroke width lets
-neighboring bolts overlap. Outline colors cycle through the eight most common
-unique colors from a deterministic 32×32 bitmap sample quantized to six-bit RGB.
+Its procedural lightning evolves at 20× real time. The current treatment uses
+thin antialiased lines with seeded-random tendrils. Outline colors cycle through
+the eight most common unique colors from a deterministic 32×32 bitmap sample quantized to six-bit RGB.
 The library receives these values through `FxMetadataChannels`, so palette
 extraction remains an app-owned operation. `FxArtworkView` resumes rendering
 when reattached after fullscreen reparenting, ignores stale SurfaceTexture
@@ -237,3 +237,22 @@ ranking/deduplication, full-output graph defaults, and bounded render retry
 delays. `adb devices -l` reported no attached device, so fullscreen GLES
 recovery, visual palette contrast, actual edge coverage, shader-driver behavior,
 and performance remain **not verified on device**.
+
+### Random hairline lightning with tendrils — 2026-11-21
+
+The lightning-spectrum generator now uses seeded, interpolated hash noise for
+its trunk, side branches, secondary twigs, idle pulse, and flicker instead of
+sine-wave shapes. Its line core is screen-space antialiased at approximately
+one output pixel. Six independently seeded tendrils and a short twig per tendril
+are enabled by default; the editor adjusts tendril count, while preserving the
+20× animation-speed setting. The editor replaces the previous stroke-width
+slider with a tendril-count slider. `branchCount` replaces `boltWidth` in library
+descriptor v5. The app pins library commit `4b0955cec4ced121ab69f5dd06c9006bbccceb5f`. The source revision and verification
+results are recorded in the library's [test log](../libraries/libinfinifx/docs/builds-and-testing.md).
+
+PASS: `python3 scripts/fetch-dependencies.py --check` verified the library pin.
+PASS: `ANDROID_HOME="$HOME/android-sdk" ./build.sh --no-daemon --max-workers=1
+--console=plain` assembled the InfiniMedia debug APK and passed all 133
+viewer-audio unit tests (0 failures, 0 errors, 0 skipped). `adb devices -l`
+reported no connected device, so the resulting lightning appearance and GLES
+driver/runtime behavior remain **not verified on device**.

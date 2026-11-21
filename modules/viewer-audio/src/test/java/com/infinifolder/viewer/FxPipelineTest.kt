@@ -35,7 +35,7 @@ class FxPipelineTest {
         assertEquals(1f, (node.parameters.getValue("maxHeight") as org.infiniforge.fx.api.FxParameterValue.FloatValue).value)
         assertEquals(1f, (node.parameters.getValue("gain") as org.infiniforge.fx.api.FxParameterValue.FloatValue).value)
         assertEquals(20f, (node.parameters.getValue("animationSpeed") as org.infiniforge.fx.api.FxParameterValue.FloatValue).value)
-        assertEquals(8f, (node.parameters.getValue("boltWidth") as org.infiniforge.fx.api.FxParameterValue.FloatValue).value)
+        assertEquals(6, (node.parameters.getValue("branchCount") as org.infiniforge.fx.api.FxParameterValue.IntValue).value)
     }
 
     @Test fun lightningSpectrumStartsWithAVisibleIdleBaseline() {
@@ -55,12 +55,12 @@ class FxPipelineTest {
 
     @Test fun lightningSpectrumEditorParametersReachTheGeneratorNode() {
         val pipeline = RandomFxPipeline(Random(4))
-        pipeline.updateLightningSpectrumStyle(LightningSpectrumStyle(gain = 3.4f, maxHeight = .72f, widthScale = .76f, boltWidth = 10f, animationSpeed = 30f, glow = 1.2f))
+        pipeline.updateLightningSpectrumStyle(LightningSpectrumStyle(gain = 3.4f, maxHeight = .72f, widthScale = .76f, branchCount = 7, animationSpeed = 30f, glow = 1.2f))
         val node = pipeline.graph().nodes.single { it.id == "lightning_spectrum" }
         assertEquals(3.4f, (node.parameters.getValue("gain") as org.infiniforge.fx.api.FxParameterValue.FloatValue).value)
         assertEquals(.72f, (node.parameters.getValue("maxHeight") as org.infiniforge.fx.api.FxParameterValue.FloatValue).value)
         assertEquals(.76f, (node.parameters.getValue("widthScale") as org.infiniforge.fx.api.FxParameterValue.FloatValue).value)
-        assertEquals(10f, (node.parameters.getValue("boltWidth") as org.infiniforge.fx.api.FxParameterValue.FloatValue).value)
+        assertEquals(7, (node.parameters.getValue("branchCount") as org.infiniforge.fx.api.FxParameterValue.IntValue).value)
         assertEquals(30f, (node.parameters.getValue("animationSpeed") as org.infiniforge.fx.api.FxParameterValue.FloatValue).value)
     }
 
