@@ -1,24 +1,61 @@
 package com.infinifolder.viewer
 
+import org.infiniforge.fx.api.BuiltinFx
 import org.infiniforge.fx.api.FxConnection
+import org.infiniforge.fx.api.FxEffectCategory
+import org.infiniforge.fx.api.FxEffectDescriptor
 import org.infiniforge.fx.api.FxGraph
 import org.infiniforge.fx.api.FxNode
 import org.infiniforge.fx.api.FxParameterValue
-import kotlin.random.Random
 
-/** A temporary test policy: keep a two-stage image pipeline and replace one stage per media item. */
-internal class RandomFxPipeline(private val random: Random = Random.Default) {
-    private val availableEffects = listOf(
-        "display:crt",
-        "display:lcd",
-        "distort:water-refraction",
-        "distort:heat-ripple",
-        "distort:kaleidoscope",
-        "generator:fire",
-    )
-    private val stages = mutableListOf("display:crt", "distort:water-refraction")
-    private var replacementCount = 0L
+/** App-owned, ordered image-effect chain with an always-on spectrum overlay. */
+internal class FxEffectPipeline {
+    private val selectableEffects = BuiltinFx.descriptors.filter { descriptor ->
+        descriptor.category != FxEffectCategory.COMPOSITOR && descriptor.id != "generator:lightning-spectrum"
+    }
+    private val selectableIds = selectableEffects.mapTo(HashSet()) { it.id }
+    private val stages = mutableListOf("distort:rotozoom", "display:crt", "distort:water-refraction")
+    private var graphRevision = 0L
     private var lightningStyle = LightningSpectrumStyle()
+
+    @Synchronized
+    fun availableFilters(): List<FxEffectDescriptor> = selectableEffects
+
+    @Synchronized
+    fun currentEffects(): List<String> = stages.toList()
+
+    @Synchronized
+    fun replaceStage(index: Int, effectId: String) {
+        require(index in stages.indices) { "Effect-chain item $index does not exist" }
+        require(effectId in selectableIds) { "Effect $effectId is not available as an image-chain effect" }
+        stages[index] = effectId
+        graphRevision++
+    }
+
+    @Synchronized
+    fun addStage(effectId: String): Int {
+        require(effectId in selectableIds) { "Effect $effectId is not available as an image-chain effect" }
+        check(stages.size < MAX_STAGES) { "The image-effect chain is limited to $MAX_STAGES items" }
+        stages += effectId
+        graphRevision++
+        return stages.lastIndex
+    }
+
+    @Synchronized
+    fun removeStage(index: Int): String {
+        require(index in stages.indices) { "Effect-chain item $index does not exist" }
+        graphRevision++
+        return stages.removeAt(index)
+    }
+
+    @Synchronized
+    fun moveStage(fromIndex: Int, toIndex: Int) {
+        require(fromIndex in stages.indices && toIndex in stages.indices) { "Effect-chain position is out of range" }
+        if (fromIndex == toIndex) return
+        val effect = stages.removeAt(fromIndex)
+        stages.add(toIndex, effect)
+        graphRevision++
+    }
 
     @Synchronized
     fun lightningSpectrumStyle(): LightningSpectrumStyle = lightningStyle
@@ -26,31 +63,14 @@ internal class RandomFxPipeline(private val random: Random = Random.Default) {
     @Synchronized
     fun updateLightningSpectrumStyle(value: LightningSpectrumStyle) {
         lightningStyle = value
+        graphRevision++
     }
-
-    @Synchronized
-    fun replaceOneRandomStage(): Change {
-        val slot = random.nextInt(stages.size)
-        val old = stages[slot]
-        val choices = availableEffects.filter { it != old && it !in stages }
-        check(choices.isNotEmpty()) { "No distinct FX effect is available for replacement" }
-        val replacement = choices[random.nextInt(choices.size)]
-        stages[slot] = replacement
-        replacementCount++
-        return Change(slot, old, replacement, replacementCount)
-    }
-
-    @Synchronized
-    fun currentEffects(): List<String> = stages.toList()
 
     @Synchronized
     fun graph(): FxGraph {
         val nodes = mutableListOf<FxNode>()
         val connections = mutableListOf<FxConnection>()
-        val rotozoom = "artwork_rotozoom"
-        nodes += FxNode(rotozoom, "distort:rotozoom")
-        connections += FxConnection(FxGraph.SOURCE_NODE_ID, rotozoom, "image")
-        var current = rotozoom
+        var current = FxGraph.SOURCE_NODE_ID
         stages.forEachIndexed { index, effectId ->
             if (effectId == "generator:fire") {
                 val generator = "stage_${index}_generator"
@@ -85,16 +105,17 @@ internal class RandomFxPipeline(private val random: Random = Random.Default) {
         nodes += FxNode(blend, "composite:blend")
         connections += FxConnection(current, blend, "base")
         connections += FxConnection(spectrum, blend, "overlay")
-        current = blend
         return FxGraph(
-            name = "infinimedia-random-${replacementCount}",
+            name = "infinimedia-fx-$graphRevision",
             nodes = nodes,
             connections = connections,
-            outputNodeId = current,
+            outputNodeId = blend,
         )
     }
 
-    internal data class Change(val slot: Int, val previous: String, val replacement: String, val count: Long)
+    companion object {
+        const val MAX_STAGES = 12
+    }
 }
 
 internal data class LightningSpectrumStyle(
@@ -107,8 +128,7 @@ internal data class LightningSpectrumStyle(
     val idleHeight: Float = .14f,
 )
 
-
-/** A narrow recovery graph keeps the spectrum available if a randomized image filter fails. */
+/** A narrow recovery graph keeps the spectrum available if an image-effect graph fails. */
 internal fun FxGraph.lightningOnlyFallback(): FxGraph? {
     val lightning = nodes.firstOrNull { it.effectId == "generator:lightning-spectrum" } ?: return null
     return FxGraph(

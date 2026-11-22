@@ -17,9 +17,11 @@ or Infiniscribe as Gradle projects and does not import their application source.
   prototypes and hosts a `libinfinifx` graph over audio artwork/static images.
   Its TextureView-backed `FxArtworkView` owns an EGL/GLES render thread and bitmap
   texture lifecycle, preserving normal Android child-view composition.
-  RandomFxPipeline fixes tempo-smoothed, bounded rotozoom as the first artwork
-  stage, randomly replaces one of two following effect stages per changed visual
-  item, then alpha-composites a full-output lightning-spectrum layer with 20×-speed seeded-random, thin antialiased bolts, six tendrils and shorter twigs per trace by default, and no filled bar bodies. The bolts cycle through up to eight popular colors from artwork sampled on a deterministic 32×32 grid and quantized to six-bit RGB (two bits per channel), with duplicate bins merged and ranked by frequency. Zero-valued bands have zero height. A player-owned
+  FxEffectPipeline owns an ordered, user-editable image-effect chain (default: rotozoom, CRT, water refraction). Its editor can
+  replace, reorder, add, and remove items (up to 12) and preserves choices across
+  track changes. It then alpha-composites a full-output lightning-spectrum layer
+  with 20×-speed seeded-random antialiased bolts, six tendrils and shorter twigs
+  per trace by default, and no filled bar bodies. The bolts cycle through up to eight popular colors from artwork sampled on a deterministic 32×32 grid and quantized to six-bit RGB (two bits per channel), with duplicate bins merged and ranked by frequency. Zero-valued bands have zero height. A player-owned
   metadata label sits above the full-pane effect stack. libinfinisound supplies
   estimated tempo and low-band transient events through the existing PCM
   analyzer. The app owns a small live parameter editor and metadata fade schedule.

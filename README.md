@@ -13,9 +13,14 @@ Reusable decoding, synthesis and timing belong to libinfinisound/libinfinivideo.
 The media pane runs libinfinifx over album art and static images. Artwork fills
 the pane with a centered crop by default. Square art on a 16:9 pane is fitted to
 pane width; its Y begins 7/32 of the pane width above the top edge, cropping
-7/32 from each vertical edge. Each image graph starts with tempo-smoothed,
-bounded album-art rotozoom, then runs two temporary randomized effect stages,
-and finishes with a full-width, full-height lightning-spectrum layer. Its hairline-antialiased paths use seeded random motion and six thin side tendrils with shorter twigs per trace by default. The lightning has no filled bar boxes; its colors cycle through the eight most popular colors detected from a deterministic six-bit RGB quantization of the artwork.
+7/32 from each vertical edge. The editable chain initially contains album-art rotozoom, CRT, and water
+refraction. Any row can be replaced, moved, or removed; available effects can be
+added up to a 12-stage total. The graph finishes with a full-width, full-height
+lightning-spectrum layer. Its antialiased bright core is about 1.4 output pixels
+at nominal scale, with seeded random motion and six side tendrils plus shorter
+twigs per trace by default. It draws no filled bar boxes; its colors cycle
+through the eight most popular colors detected from a deterministic six-bit RGB
+quantization of the artwork.
 The MTV-style metadata
 label is player UI outside the graph, so it never consumes or reduces the
 effects' render area; it stays above the artwork, FX output, and spectrum.
@@ -34,14 +39,16 @@ throughout; tracks without a known duration fade it out after 10 seconds and
 cannot schedule the end fade-in. Seeking uses playback position to restore the
 matching opacity.
 
-The randomized stages currently choose CRT, handheld LCD, water refraction,
-heat ripple, kaleidoscope, or a fire generator with explicit alpha composition.
-This temporary policy changes one stage when the visual playlist item changes;
-there is no effect picker yet. The spectrum generator maps the normalized 16 PCM
+The FX editor lists the available library effects and the active ordered chain.
+Each chain row can be replaced, moved, or removed; available effects can be added
+up to 12 stages. The selected chain persists when the visual playlist item changes.
+Fire is added as a generated layer with explicit alpha composition. The lightning
+spectrum remains a separate always-on overlay. The spectrum generator maps the normalized 16 PCM
 bands to thin antialiased electric lightning spanning the full output width and height by default; seeded random paths grow six tendrils and short twigs per trace. No filled bar boxes are drawn. Lightning colors use the artwork's top detected palette colors; present zero-valued bands have zero height. Its full-width segmented fallback is anchored at the
 pane's bottom edge until the first GPU frame swaps successfully, and
 returns if the graph cannot render. Tap the
-visual pane to reveal EDIT FX beside the full-screen button.
+visual pane to reveal EDIT FX beside the full-screen button. The editor shows the
+active chain and available filters, with Add, Replace, Move, and Remove controls.
 
 Animated image, video, ANSI, and ANSI Music continue on their existing
 presentation paths. The GLES 3 backend accepts 2D textures; video currently
@@ -253,3 +260,15 @@ APK. The artwork view resumes its render loop after fullscreen reparenting and
 retries transient EGL failures with bounded backoff. Device visual and
 performance acceptance remain outstanding; see
 [visualization status](docs/visualization-prototypes.md).
+
+## Editable InfiniFX chain — 2026-11-21
+
+InfiniMedia now pins libinfinifx commit
+`197b639e141e099140ab33019dbb6002e63f3bd8`. The FX editor lists the available
+filters/effects and current ordered chain. It can replace, move, add, or remove
+items (up to 12); the selection survives track changes. The lightning-spectrum
+layer remains an independent overlay. `:viewer-audio:testDebugUnitTest` passed
+134 tests, and `./build.sh --no-daemon --max-workers=1 --console=plain` assembled
+`InfiniMedia-debug.apk`. The library's portable tests, shader-source validation,
+and AAR/sample build also passed. No Android device was attached, so updated
+lightning appearance and the editor's on-device layout remain unverified.

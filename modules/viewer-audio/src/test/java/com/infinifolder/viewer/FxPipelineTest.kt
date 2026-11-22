@@ -1,51 +1,62 @@
 package com.infinifolder.viewer
 
 import org.infiniforge.fx.api.BuiltinFx
-import org.infiniforge.fx.api.FxGraphValidator
 import org.infiniforge.fx.api.FxGraph
-import kotlin.random.Random
+import org.infiniforge.fx.api.FxGraphValidator
+import org.infiniforge.fx.api.FxParameterValue
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FxPipelineTest {
-    @Test fun randomReplacementChangesOneSlotAndEveryGeneratedGraphValidates() {
-        val pipeline = RandomFxPipeline(Random(991))
-        repeat(32) {
-            val before = pipeline.currentEffects()
-            val change = pipeline.replaceOneRandomStage()
-            val after = pipeline.currentEffects()
-            assertEquals(before.size, after.size)
-            assertNotEquals(change.previous, change.replacement)
-            assertEquals(change.replacement, after[change.slot])
-            assertTrue(before.indices.filter { it != change.slot }.all { before[it] == after[it] })
-            val graph = pipeline.graph()
-            FxGraphValidator.validate(graph, BuiltinFx.byId)
-            assertEquals("distort:rotozoom", graph.nodes.single { it.id == "artwork_rotozoom" }.effectId)
-            assertTrue(graph.connections.any { it.fromNodeId == FxGraph.SOURCE_NODE_ID && it.toNodeId == "artwork_rotozoom" })
-            assertEquals("generator:lightning-spectrum", graph.nodes.single { it.id == "lightning_spectrum" }.effectId)
-            assertTrue(graph.connections.any { it.fromNodeId == "lightning_spectrum" && it.inputPort == "overlay" })
-        }
+    @Test fun editorCanReplaceAddReorderAndRemoveAnyStage() {
+        val pipeline = FxEffectPipeline()
+        assertEquals(listOf("distort:rotozoom", "display:crt", "distort:water-refraction"), pipeline.currentEffects())
+        assertTrue(pipeline.availableFilters().any { it.id == "distort:kaleidoscope" })
+
+        pipeline.replaceStage(1, "display:lcd")
+        pipeline.moveStage(2, 0)
+        pipeline.addStage("distort:kaleidoscope")
+        assertEquals(listOf("distort:water-refraction", "distort:rotozoom", "display:lcd", "distort:kaleidoscope"), pipeline.currentEffects())
+        assertEquals("display:lcd", pipeline.removeStage(2))
+        assertEquals(listOf("distort:water-refraction", "distort:rotozoom", "distort:kaleidoscope"), pipeline.currentEffects())
+        pipeline.addStage("generator:fire")
+        assertValidGraph(pipeline.graph())
     }
 
-    @Test fun lightningSpectrumDefaultsToEdgeToEdgeImageCoverage() {
-        val node = RandomFxPipeline(Random(9)).graph().nodes.single { it.id == "lightning_spectrum" }
-        assertEquals(1f, (node.parameters.getValue("widthScale") as org.infiniforge.fx.api.FxParameterValue.FloatValue).value)
-        assertEquals(1f, (node.parameters.getValue("maxHeight") as org.infiniforge.fx.api.FxParameterValue.FloatValue).value)
-        assertEquals(1f, (node.parameters.getValue("gain") as org.infiniforge.fx.api.FxParameterValue.FloatValue).value)
-        assertEquals(20f, (node.parameters.getValue("animationSpeed") as org.infiniforge.fx.api.FxParameterValue.FloatValue).value)
-        assertEquals(6, (node.parameters.getValue("branchCount") as org.infiniforge.fx.api.FxParameterValue.IntValue).value)
+    @Test fun emptyChainPassesArtworkThroughToLightningOverlay() {
+        val pipeline = FxEffectPipeline()
+        while (pipeline.currentEffects().isNotEmpty()) pipeline.removeStage(0)
+        val graph = pipeline.graph()
+        assertEquals(FxGraph.SOURCE_NODE_ID, graph.connections.first { it.toNodeId == "lightning_blend" }.fromNodeId)
+        assertEquals("generator:lightning-spectrum", graph.nodes.single { it.id == "lightning_spectrum" }.effectId)
+        assertValidGraph(graph)
     }
 
-    @Test fun lightningSpectrumStartsWithAVisibleIdleBaseline() {
-        val pipeline = RandomFxPipeline(Random(9))
-        val node = pipeline.graph().nodes.single { it.id == "lightning_spectrum" }
-        assertEquals(.14f, (node.parameters.getValue("idleHeight") as org.infiniforge.fx.api.FxParameterValue.FloatValue).value)
+    @Test fun chainRejectsInvalidIdsPositionsAndMoreThanMaximumStages() {
+        val pipeline = FxEffectPipeline()
+        try { pipeline.replaceStage(0, "generator:lightning-spectrum"); throw AssertionError("overlay should not be a chain filter") }
+        catch (_: IllegalArgumentException) { }
+        try { pipeline.removeStage(8); throw AssertionError("out-of-range removal should fail") }
+        catch (_: IllegalArgumentException) { }
+        while (pipeline.currentEffects().size < FxEffectPipeline.MAX_STAGES) pipeline.addStage("core:passthrough")
+        assertValidGraph(pipeline.graph())
+        try { pipeline.addStage("core:passthrough"); throw AssertionError("chain cap should be enforced") }
+        catch (_: IllegalStateException) { }
+    }
+
+    @Test fun lightningSpectrumKeepsExpectedDefaultsAndZeroFreeIdleBaseline() {
+        val node = FxEffectPipeline().graph().nodes.single { it.id == "lightning_spectrum" }
+        assertEquals(1f, (node.parameters.getValue("widthScale") as FxParameterValue.FloatValue).value)
+        assertEquals(1f, (node.parameters.getValue("maxHeight") as FxParameterValue.FloatValue).value)
+        assertEquals(1f, (node.parameters.getValue("gain") as FxParameterValue.FloatValue).value)
+        assertEquals(20f, (node.parameters.getValue("animationSpeed") as FxParameterValue.FloatValue).value)
+        assertEquals(6, (node.parameters.getValue("branchCount") as FxParameterValue.IntValue).value)
+        assertEquals(.14f, (node.parameters.getValue("idleHeight") as FxParameterValue.FloatValue).value)
     }
 
     @Test fun lightningOnlyFallbackIsAValidGeneratorGraphAndKeepsStyle() {
-        val graph = RandomFxPipeline(Random(8)).graph()
+        val graph = FxEffectPipeline().graph()
         val fallback = requireNotNull(graph.lightningOnlyFallback())
         FxGraphValidator.validate(fallback, BuiltinFx.byId)
         assertEquals("generator:lightning-spectrum", fallback.nodes.single().effectId)
@@ -53,15 +64,15 @@ class FxPipelineTest {
         assertEquals(graph.nodes.single { it.id == "lightning_spectrum" }.parameters, fallback.nodes.single().parameters)
     }
 
-    @Test fun lightningSpectrumEditorParametersReachTheGeneratorNode() {
-        val pipeline = RandomFxPipeline(Random(4))
+    @Test fun lightningEditorParametersReachTheGeneratorNode() {
+        val pipeline = FxEffectPipeline()
         pipeline.updateLightningSpectrumStyle(LightningSpectrumStyle(gain = 3.4f, maxHeight = .72f, widthScale = .76f, branchCount = 7, animationSpeed = 30f, glow = 1.2f))
         val node = pipeline.graph().nodes.single { it.id == "lightning_spectrum" }
-        assertEquals(3.4f, (node.parameters.getValue("gain") as org.infiniforge.fx.api.FxParameterValue.FloatValue).value)
-        assertEquals(.72f, (node.parameters.getValue("maxHeight") as org.infiniforge.fx.api.FxParameterValue.FloatValue).value)
-        assertEquals(.76f, (node.parameters.getValue("widthScale") as org.infiniforge.fx.api.FxParameterValue.FloatValue).value)
-        assertEquals(7, (node.parameters.getValue("branchCount") as org.infiniforge.fx.api.FxParameterValue.IntValue).value)
-        assertEquals(30f, (node.parameters.getValue("animationSpeed") as org.infiniforge.fx.api.FxParameterValue.FloatValue).value)
+        assertEquals(3.4f, (node.parameters.getValue("gain") as FxParameterValue.FloatValue).value)
+        assertEquals(.72f, (node.parameters.getValue("maxHeight") as FxParameterValue.FloatValue).value)
+        assertEquals(.76f, (node.parameters.getValue("widthScale") as FxParameterValue.FloatValue).value)
+        assertEquals(7, (node.parameters.getValue("branchCount") as FxParameterValue.IntValue).value)
+        assertEquals(30f, (node.parameters.getValue("animationSpeed") as FxParameterValue.FloatValue).value)
     }
 
     @Test fun existingAnalyzerLevelsMapToNormalizedFxMetadata() {
@@ -80,5 +91,11 @@ class FxPipelineTest {
         assertEquals((0f + 1f / 15f + 2f / 15f + 3f / 15f) / 4f, metadata.lowEnergy, .0001f)
         assertEquals(((4f + 5f + 6f + 7f + 8f + 9f) / 15f) / 6f, metadata.midEnergy, .0001f)
         assertEquals(12.5f / 15f, metadata.highEnergy, .0001f)
+    }
+
+    private fun assertValidGraph(graph: FxGraph) {
+        FxGraphValidator.validate(graph, BuiltinFx.byId)
+        assertTrue(graph.nodes.any { it.id == "lightning_spectrum" })
+        assertTrue(graph.connections.any { it.fromNodeId == "lightning_spectrum" && it.inputPort == "overlay" })
     }
 }

@@ -12,7 +12,7 @@ reusable effects and graph execution.
   a full-width instance is anchored to the pane's bottom edge and remains visible
   until an InfiniFX frame successfully swaps to the TextureView surface, then
   returns if rendering fails. Its quiet baseline stays visible before audio
-  analysis arrives; the metadata label overlays it at lower left. A randomized graph
+  analysis arrives; the metadata label overlays it at lower left. An effect graph
   failure retries a minimal lightning-only libinfinifx graph; diagnostics record
   the original error, surface readiness, and successful frame swaps.
 - `WinampMainWindowView` can switch among spectrum, oscilloscope, and VU modes.
@@ -33,31 +33,39 @@ artwork can sit between the underlying album-art ImageView and the existing
 title/spectrum overlays. The spectrum fallback is hidden only after the first
 successful `eglSwapBuffers`. This replaces a SurfaceView configured as a media
 overlay, whose special surface z-order could place it behind ordinary content
-in the host window ([Android SurfaceView documentation](https://developer.android.com/reference/android/view/SurfaceView)). If a randomized effect graph fails, the host retries the lightning generator alone through libinfinifx and logs the original error. The original artwork remains visible underneath the transparent output; the full-width segmented spectrum fallback stays available until a rendered frame has successfully swapped and returns if the lightning-only graph also fails.
+in the host window ([Android SurfaceView documentation](https://developer.android.com/reference/android/view/SurfaceView)). If an image-effect graph fails, the host retries the lightning generator alone through libinfinifx and logs the original error. The original artwork remains visible underneath the transparent output; the full-width segmented spectrum fallback stays available until a rendered frame has successfully swapped and returns if the lightning-only graph also fails.
 
-The RandomFxPipeline begins every artwork graph with tempo-smoothed, bounded
-distort:rotozoom motion, then holds two sequential randomized image-effect stages.
-On each changed visual playlist item it chooses one randomized stage and
-replaces it with a different available effect ID. The final graph adds an
-independent generator:lightning-spectrum branch and alpha-blends it over the
-processed artwork. It covers the output width and height by default and draws
-only outlined lightning paths: there are no filled rectangular bar bodies. Each
-frequency slot selects from up to eight popular artwork colors. The app samples
-the bitmap on a deterministic 32×32 grid, quantizes RGB to six bits total (two
-bits per channel), merges duplicate bins, averages colors within each bin, and
-orders the palette by sample count. The app passes normalized sRGB palette
-channels to the library; no image analysis or Android dependency is added to
-libinfinifx. Present zero-valued bands have zero height; the low autonomous
-baseline is used only when band data is missing. The segmented prototype is also full-width
-and keeps a quiet baseline while acting as the first-frame or error fallback.
-The randomized options are CRT, LCD, water refraction, heat ripple, kaleidoscope,
-and the independent fire generator followed by an explicit alpha blend. This is
-temporary testing behavior, not a selection UI; deliberate user/app selection
-can later replace this policy while retaining the public graph/effect
-contracts. Tapping the visual pane reveals EDIT FX beside the full-screen button
-for the same four-second overlay window. It adjusts linear gain, maximum height,
-width (default 100%), spacing, glow, and idle baseline, applying changes to the active graph as the
-sliders move. Renderer status, band levels, and errors are recorded in the app
+The FxEffectPipeline executes an ordered user-editable chain. Its default order
+is tempo-smoothed, bounded distort:rotozoom, display:crt, then
+distort:water-refraction; each item can be replaced or removed. The FX editor lists available
+filters/effects and every active chain item. Each row can be replaced with any
+available image-chain effect, moved up or down, or removed; Add controls append
+available effects. The chain may contain zero through twelve items, and its
+selection persists when the playlist changes. Fire is a generator inserted as an
+explicit alpha-composited layer. The lightning-spectrum generator remains a
+separate, always-on overlay above the processed artwork. An empty image chain
+passes the album art through to that overlay.
+
+The default chain is rotozoom, CRT, and water refraction. Available options
+include pass-through, CRT, LCD, rotozoom, kaleidoscope, water refraction, heat
+ripple, and the fire layer. Graph validation and the renderer's effect contracts
+remain in libinfinifx; UI and selection state are app-owned. The editor also
+controls lightning gain, height, width (default 100%), tendrils, speed, glow, and
+idle baseline, applying changes to the active graph as the controls move.
+
+The lightning branch covers the output width and height by default and draws
+only antialiased lightning paths: there are no filled rectangular bar bodies.
+Each frequency slot selects from up to eight popular artwork colors. The app
+samples the bitmap on a deterministic 32×32 grid, quantizes RGB to six bits
+total (two bits per channel), merges duplicate bins, averages colors within
+each bin, and orders the palette by sample count. Present zero-valued bands have
+zero height; the low autonomous baseline is used only when band data is missing.
+The segmented prototype is full-width and keeps a quiet baseline while acting
+as the first-frame or error fallback.
+
+Tapping the visual pane reveals EDIT FX beside the full-screen button for the
+same four-second overlay window.
+Renderer status, band levels, and errors are recorded in the app
 DiagnosticLog under audio.fx.*. Effect IDs and parameter schemas come from
 libinfinifx.
 
@@ -121,7 +129,7 @@ On 2026-11-20, after pinning libinfinifx commit
 `7bc9ae8b115ba54b469c765bd5d34f77deb46f5c`, the standalone Termux command
 `./build.sh --no-daemon --max-workers=1 --console=plain` completed successfully.
 It assembled `InfiniMedia-debug.apk` and passed all 121 JVM unit tests, including
-the five `FxPipelineTest` cases for valid generated graphs, lightning overlay,
+the seven `FxPipelineTest` cases for valid generated graphs, lightning overlay,
 lightning-only fallback validation, visible idle baseline, and editor parameter
 propagation. The build includes the TextureView/EGL renderer, lightning generator graph
 branch, silent-band visibility floor, parameter editor, and `audio.fx.*`
@@ -242,8 +250,8 @@ and performance remain **not verified on device**.
 
 The lightning-spectrum generator now uses seeded, interpolated hash noise for
 its trunk, side branches, secondary twigs, idle pulse, and flicker instead of
-sine-wave shapes. Its line core is screen-space antialiased at approximately
-one output pixel. Six independently seeded tendrils and a short twig per tendril
+sine-wave shapes. Its bright core is screen-space antialiased at approximately 1.4 output
+pixels at nominal scale. Six independently seeded tendrils and a short twig per tendril
 are enabled by default; the editor adjusts tendril count, while preserving the
 20× animation-speed setting. The editor replaces the previous stroke-width
 slider with a tendril-count slider. `branchCount` replaces `boltWidth` in library
@@ -256,3 +264,31 @@ PASS: `ANDROID_HOME="$HOME/android-sdk" ./build.sh --no-daemon --max-workers=1
 viewer-audio unit tests (0 failures, 0 errors, 0 skipped). `adb devices -l`
 reported no connected device, so the resulting lightning appearance and GLES
 driver/runtime behavior remain **not verified on device**.
+
+
+### Editable image-effect chain — 2026-11-21
+
+The FX editor now displays both the available libinfinifx image effects and the
+current ordered chain. A user can replace any row, move it up or down, add an
+available effect, or remove an item. The chain accepts zero through twelve
+stages; the starting selection is rotozoom, CRT, and water refraction, and it
+remains selected across track changes. Fire is represented as an independent
+generator layer with explicit alpha blending. Lightning spectrum remains a
+separate overlay. Per-effect parameter editing and saved recipes are still
+future work; the current sliders continue to control the lightning overlay.
+
+InfiniMedia pins libinfinifx commit
+`197b639e141e099140ab33019dbb6002e63f3bd8`.
+`python3 scripts/fetch-dependencies.py --check` verified all pinned revisions.
+PASS: `ANDROID_HOME="$HOME/android-sdk" ./gradlew :viewer-audio:testDebugUnitTest
+--no-daemon --max-workers=1 --console=plain` — 134 tests, zero failures,
+errors, or skips. PASS: `ANDROID_HOME="$HOME/android-sdk" ./build.sh
+--no-daemon --max-workers=1 --console=plain` assembled
+`InfiniMedia-debug.apk` from the same library source tree.
+
+The lightning shader also no longer clamps noisy spine positions at the band
+edge, which could create a short straight vertical streak. Its antialiased core
+is slightly stronger at about 1.4 output pixels at nominal scale. Shader syntax
+validation, GLES AAR/sample assembly, and portable library tests passed;
+`adb devices -l` reports no connected device, so the editor presentation and
+updated stroke appearance remain **not verified on device**.

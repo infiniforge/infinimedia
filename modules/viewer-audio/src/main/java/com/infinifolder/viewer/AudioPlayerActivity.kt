@@ -161,7 +161,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
     private lateinit var artCard: FrameLayout
     private lateinit var albumArtView: ImageView
     private lateinit var fxArtworkView: FxArtworkView
-    private val fxPipeline = RandomFxPipeline()
+    private val fxPipeline = FxEffectPipeline()
     private val fxFallbackArtwork: Bitmap by lazy(LazyThreadSafetyMode.NONE) { createFxFallbackArtwork() }
     private lateinit var fullscreenVideoButton: TextView
     private var fullscreenVideoControls: LinearLayout? = null
@@ -1161,7 +1161,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
         }
         fullscreenVideoButton.visibility = View.VISIBLE
         if (::visualFxEditorOverlayButton.isInitialized) {
-            visualFxEditorOverlayButton.visibility = if (canShowLightningSpectrumEditor()) View.VISIBLE else View.GONE
+            visualFxEditorOverlayButton.visibility = if (canShowFxPipelineEditor()) View.VISIBLE else View.GONE
         }
         if (isLandscapeVideoFullscreen) {
             fullscreenVideoControls?.visibility = View.VISIBLE
@@ -1777,9 +1777,9 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
                 setColor(0xD9000000.toInt())
                 setStroke(dp(1), 0x9979DFFF.toInt())
             }
-            contentDescription = "Edit lightning spectrum visualization effects"
+            contentDescription = "Edit visual effect chain and lightning overlay"
             visibility = View.GONE
-            setOnClickListener { showLightningSpectrumEditor() }
+            setOnClickListener { showFxPipelineEditor() }
         }
         artCard.addView(visualFxEditorOverlayButton, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END).apply {
             topMargin = dp(10)
@@ -3847,9 +3847,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
             if (::fxArtworkView.isInitialized) {
                 fxRenderAvailable = false
                 fxArtworkView.setSourceBitmap(null)
-                val change = fxPipeline.replaceOneRandomStage()
                 fxArtworkView.setGraph(fxPipeline.graph(), resetHistory = true)
-                android.util.Log.i("InfiniMediaFx", "Random pipeline stage ${change.slot}: ${change.previous} -> ${change.replacement}")
             }
             visualLoadGeneration.incrementAndGet()
             visualImageAdvanceHandler.removeCallbacks(visualImageAdvanceRunnable)
@@ -4062,12 +4060,11 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
         updateDockedPlaylist()
     }
 
-    private fun canShowLightningSpectrumEditor(): Boolean =
+    private fun canShowFxPipelineEditor(): Boolean =
         AudioPlayerService.currentService?.currentTrack?.mediaKind == PlaylistMediaKind.AUDIO && !isShowingAnsiOverlay
 
-    private fun showLightningSpectrumEditor() {
-        LightningSpectrumEditor(this, fxPipeline.lightningSpectrumStyle()) { style ->
-            fxPipeline.updateLightningSpectrumStyle(style)
+    private fun showFxPipelineEditor() {
+        FxPipelineEditor(this, fxPipeline) {
             if (::fxArtworkView.isInitialized) fxArtworkView.setGraph(fxPipeline.graph())
         }.show()
     }
