@@ -5,6 +5,7 @@ import org.infiniforge.fx.api.FxGraph
 import org.infiniforge.fx.api.FxGraphValidator
 import org.infiniforge.fx.api.FxParameterValue
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -22,6 +23,23 @@ class FxPipelineTest {
         assertEquals(listOf("distort:water-refraction", "distort:rotozoom", "distort:kaleidoscope"), pipeline.currentEffects())
         pipeline.addStage("generator:fire")
         assertValidGraph(pipeline.graph())
+    }
+
+    @Test fun lightningRemainsASeparateOverlayAboveTheImageChain() {
+        val pipeline = FxEffectPipeline()
+        assertFalse(pipeline.availableFilters().any { it.id == "generator:lightning-spectrum" })
+        val graph = pipeline.graph()
+        val outputBlend = graph.nodes.single { it.id == graph.outputNodeId }
+        assertEquals("composite:blend", outputBlend.effectId)
+        assertEquals(
+            "lightning_spectrum",
+            graph.connections.single { it.toNodeId == outputBlend.id && it.inputPort == "overlay" }.fromNodeId,
+        )
+        assertEquals(
+            "stage_2",
+            graph.connections.single { it.toNodeId == outputBlend.id && it.inputPort == "base" }.fromNodeId,
+        )
+        assertValidGraph(graph)
     }
 
     @Test fun emptyChainPassesArtworkThroughToLightningOverlay() {

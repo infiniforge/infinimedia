@@ -36,12 +36,12 @@ overlay, whose special surface z-order could place it behind ordinary content
 in the host window ([Android SurfaceView documentation](https://developer.android.com/reference/android/view/SurfaceView)). If an image-effect graph fails, the host retries the lightning generator alone through libinfinifx and logs the original error. The original artwork remains visible underneath the transparent output; the full-width segmented spectrum fallback stays available until a rendered frame has successfully swapped and returns if the lightning-only graph also fails.
 
 The FxEffectPipeline executes an ordered user-editable chain. Its default order
-is tempo-smoothed, bounded distort:rotozoom, display:crt, then
-distort:water-refraction; each item can be replaced or removed. The FX editor lists available
-filters/effects and every active chain item. Each row can be replaced with any
-available image-chain effect, moved up or down, or removed; Add controls append
-available effects. The chain may contain zero through twelve items, and its
-selection persists when the playlist changes. Fire is a generator inserted as an
+is timestamp-animated, tempo-smoothed distort:rotozoom, display:crt, then
+distort:water-refraction. The FX editor lists available filters and every active
+chain item as a dark dropdown. Each dropdown offers all image-chain effects and
+ends with Delete; the Add effect dropdown appears below the chain. The chain may
+contain zero through twelve items, and its selection persists when the playlist
+changes. Fire is a generator inserted as an
 explicit alpha-composited layer. The lightning-spectrum generator remains a
 separate, always-on overlay above the processed artwork. An empty image chain
 passes the album art through to that overlay.
@@ -101,11 +101,13 @@ overlap. With unknown duration it fades out after 10 seconds and stays hidden.
 The host maps the existing smoothed 16 spectrum bands to normalized low/mid/high
 energy and uses the existing VU RMS/peak values. libinfinisound estimates tempo
 from the low-band envelope and emits uniquely numbered low-band transient
-events through the same analysis stream. Rotozoom scales its base rotation rate
-relative to 120 BPM, clamped to 0.5x–2x; transient events pulse zoom and
-rotation. This lightweight estimate is not a beat-grid or musical downbeat
-detector. The adapter maps event IDs and timestamps into FxAudioEvent, whose
-per-node cursor prevents replay when a metadata snapshot is reused. Missing or
+events through the same analysis stream. Rotozoom and kaleidoscope integrate
+their own rotation phases from monotonic frame timestamps. Tempo scales their
+configured rates within bounded limits; transient events can pulse rotozoom and
+optional modulation affects kaleidoscope. This lightweight estimate is not a
+beat-grid or musical downbeat detector. The adapter maps event IDs and timestamps
+into FxAudioEvent, whose per-node cursor prevents replay when a metadata snapshot
+is reused. Missing or
 stale audio metadata leaves autonomous effects animated and audio-only
 modulation at its neutral value.
 
@@ -268,17 +270,18 @@ driver/runtime behavior remain **not verified on device**.
 
 ### Editable image-effect chain — 2026-11-21
 
-The FX editor now displays both the available libinfinifx image effects and the
-current ordered chain. A user can replace any row, move it up or down, add an
-available effect, or remove an item. The chain accepts zero through twelve
-stages; the starting selection is rotozoom, CRT, and water refraction, and it
-remains selected across track changes. Fire is represented as an independent
+The FX editor shows the current ordered chain as a vertical list of dark
+dropdowns. Each dropdown lists the available libinfinifx image effects, with
+Delete as its final option. A separate Add effect dropdown sits below the chain.
+The chain accepts zero through twelve stages; the starting selection is
+rotozoom, CRT, and water refraction, and it remains selected across track
+changes. Fire is represented as an independent
 generator layer with explicit alpha blending. Lightning spectrum remains a
 separate overlay. Per-effect parameter editing and saved recipes are still
 future work; the current sliders continue to control the lightning overlay.
 
 InfiniMedia pins libinfinifx commit
-`197b639e141e099140ab33019dbb6002e63f3bd8`.
+`73291cfa9607f2b11885e5ef739ada88e2df854b`.
 `python3 scripts/fetch-dependencies.py --check` verified all pinned revisions.
 PASS: `ANDROID_HOME="$HOME/android-sdk" ./gradlew :viewer-audio:testDebugUnitTest
 --no-daemon --max-workers=1 --console=plain` — 134 tests, zero failures,
@@ -292,3 +295,18 @@ is slightly stronger at about 1.4 output pixels at nominal scale. Shader syntax
 validation, GLES AAR/sample assembly, and portable library tests passed;
 `adb devices -l` reports no connected device, so the editor presentation and
 updated stroke appearance remain **not verified on device**.
+
+
+### Autonomous rotation follow-up — 2026-11-21
+
+libinfinifx now advances both rotozoom and kaleidoscope from the host's
+monotonic frame timestamps rather than depending on per-frame delta alone. The
+first frame can use the supplied delta; later timestamp steps are clamped to
+100 ms. Each effect owns independent state, uses no-audio motion by default, and
+accepts optional bounded tempo/audio modulation. Defaults are 1.0 rad/s for
+rotozoom and 0.8 rad/s for kaleidoscope at 120 BPM. InfiniMedia pins library
+commit 73291cfa9607f2b11885e5ef739ada88e2df854b. The dependency check
+python3 scripts/fetch-dependencies.py --check passed. The standalone build
+ANDROID_HOME="$HOME/android-sdk" ./build.sh --max-workers=1 --console=plain
+assembled the APK and passed all 135 viewer-audio tests. No Android device was
+attached, so the animation is not verified on device.

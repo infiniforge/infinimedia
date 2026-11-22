@@ -1,11 +1,17 @@
 package com.infinifolder.viewer
 
 import android.content.Context
+import android.content.res.ColorStateList
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
+import android.text.TextUtils
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
-import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Spinner
@@ -20,136 +26,115 @@ internal class FxPipelineEditor(
     private val pipeline: FxEffectPipeline,
     private val onGraphChanged: () -> Unit,
 ) {
+    private val density = context.resources.displayMetrics.density
+    private fun dp(value: Int) = (value * density).toInt()
+
     fun show() {
-        val density = context.resources.displayMetrics.density
-        fun dp(value: Int) = (value * density).toInt()
         val effects = pipeline.availableFilters().sortedBy { it.title }
-        val effectNames = effects.map { it.title }
         val content = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(6), dp(16), dp(6))
+            setPadding(dp(16), dp(10), dp(16), dp(14))
+            setBackgroundColor(BACKGROUND)
         }
         val chainContainer = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-        val availableContainer = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+        val addContainer = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
         val lightningContainer = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+        val chainTitle = sectionTitle("Effect chain")
 
         content.addView(TextView(context).apply {
-            text = "Choose the ordered image-effect chain. Changes apply immediately and stay selected when the track changes. The lightning spectrum remains as a separate overlay."
-            textSize = 13f
-        }, matchWrap().apply { bottomMargin = dp(12) })
-        val chainTitle = sectionTitle("Effect chain")
-        content.addView(chainTitle, matchWrap())
+            text = "Choose an effect in each row. Delete is the last choice."
+            textSize = 12f
+            setTextColor(SECONDARY_TEXT)
+        }, matchWrap().apply { bottomMargin = dp(10) })
+        content.addView(chainTitle, matchWrap().apply { bottomMargin = dp(6) })
         content.addView(chainContainer, matchWrap())
-        content.addView(sectionTitle("Available filters and effects"), matchWrap().apply {
-            topMargin = dp(12)
-        })
-        content.addView(availableContainer, matchWrap())
-        content.addView(sectionTitle("Lightning overlay"), matchWrap().apply {
-            topMargin = dp(14)
-        })
+        content.addView(addContainer, matchWrap().apply { topMargin = dp(8); bottomMargin = dp(14) })
+        content.addView(sectionTitle("Lightning overlay"), matchWrap().apply { bottomMargin = dp(4) })
         content.addView(lightningContainer, matchWrap())
 
-        fun commitGraph() {
-            onGraphChanged()
-        }
+        fun commitGraph() = onGraphChanged()
 
+        lateinit var renderAddDropdown: () -> Unit
         fun renderChain() {
             chainContainer.removeAllViews()
-            val selectedEffects = pipeline.currentEffects()
-            chainTitle.text = "Effect chain (${selectedEffects.size}/${FxEffectPipeline.MAX_STAGES})"
-            if (selectedEffects.isEmpty()) {
+            val selected = pipeline.currentEffects()
+            chainTitle.text = "Effect chain (${selected.size}/${FxEffectPipeline.MAX_STAGES})"
+            if (selected.isEmpty()) {
                 chainContainer.addView(TextView(context).apply {
-                    text = "No image filters. Album artwork passes through to the lightning overlay."
-                    textSize = 12f
-                }, matchWrap().apply { bottomMargin = dp(8) })
-            }
-            selectedEffects.forEachIndexed { index, effectId ->
-                val descriptor = effects.firstOrNull { it.id == effectId }
-                val row = LinearLayout(context).apply {
-                    orientation = LinearLayout.VERTICAL
-                    setPadding(dp(8), dp(6), dp(8), dp(6))
-                    background = context.getDrawable(android.R.drawable.dialog_holo_light_frame)
-                }
-                row.addView(TextView(context).apply {
-                    text = "${index + 1}. ${descriptor?.title ?: effectId}"
-                    textSize = 14f
+                    text = "No filters — artwork passes through."
+                    textSize = 13f
+                    setTextColor(SECONDARY_TEXT)
+                    setPadding(dp(4), dp(8), dp(4), dp(8))
                 }, matchWrap())
-                val spinner = Spinner(context).apply {
-                    adapter = ArrayAdapter(context, android.R.layout.simple_spinner_dropdown_item, effectNames)
-                    val selectedIndex = effects.indexOfFirst { it.id == effectId }.coerceAtLeast(0)
-                    setSelection(selectedIndex, false)
-                }
-                var previousId = effectId
+            }
+            selected.forEachIndexed { index, effectId ->
+                val selectedIndex = effects.indexOfFirst { it.id == effectId }.coerceAtLeast(0)
+                val choices = effects.map { descriptor ->
+                    "${index + 1}. ${descriptor.title}"
+                } + "Delete effect"
+                val spinner = styledDropdown(
+                    choices = choices,
+                    selectedPosition = selectedIndex,
+                    destructivePosition = effects.size,
+                    contentDescription = "Effect ${index + 1}: ${effects[selectedIndex].title}",
+                )
+                var currentSelection = selectedIndex
                 spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
                     override fun onNothingSelected(parent: AdapterView<*>?) = Unit
                     override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                        val replacement = effects.getOrNull(position)?.id ?: return
-                        if (replacement == previousId) return
-                        previousId = replacement
-                        pipeline.replaceStage(index, replacement)
+                        if (position == currentSelection) return
+                        if (position == effects.size) {
+                            pipeline.removeStage(index)
+                        } else {
+                            val replacement = effects.getOrNull(position)?.id ?: return
+                            pipeline.replaceStage(index, replacement)
+                            currentSelection = position
+                        }
                         commitGraph()
                         renderChain()
                     }
                 }
-                row.addView(spinner, matchWrap())
-                descriptor?.let {
-                    row.addView(TextView(context).apply {
-                        text = it.description
-                        textSize = 11f
-                    }, matchWrap())
-                }
-                val actions = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
-                actions.addView(actionButton("↑", enabled = index > 0) {
-                    pipeline.moveStage(index, index - 1)
-                    commitGraph()
-                    renderChain()
-                }, weighted())
-                actions.addView(actionButton("↓", enabled = index < selectedEffects.lastIndex) {
-                    pipeline.moveStage(index, index + 1)
-                    commitGraph()
-                    renderChain()
-                }, weighted())
-                actions.addView(actionButton("Remove") {
-                    pipeline.removeStage(index)
-                    commitGraph()
-                    renderChain()
-                }, weighted())
-                row.addView(actions, matchWrap())
-                chainContainer.addView(row, matchWrap().apply { bottomMargin = dp(6) })
+                chainContainer.addView(spinnerRow(spinner), matchWrap().apply { bottomMargin = dp(8) })
             }
+            renderAddDropdown()
         }
 
-        fun renderAvailable() {
-            availableContainer.removeAllViews()
-            effects.forEach { descriptor ->
-                val row = LinearLayout(context).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    gravity = android.view.Gravity.CENTER_VERTICAL
-                }
-                val details = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-                details.addView(TextView(context).apply {
-                    text = descriptor.title
-                    textSize = 13f
-                }, matchWrap())
-                details.addView(TextView(context).apply {
-                    text = "${descriptor.category.name.lowercase(Locale.US)} · ${descriptor.description}"
-                    textSize = 10f
-                }, matchWrap())
-                row.addView(details, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-                row.addView(actionButton("Add", enabled = pipeline.currentEffects().size < FxEffectPipeline.MAX_STAGES) {
-                    pipeline.addStage(descriptor.id)
+        renderAddDropdown = {
+            addContainer.removeAllViews()
+            val addChoices = listOf("＋ Add effect…") + effects.map { it.title }
+            val addSpinner = styledDropdown(
+                choices = addChoices,
+                selectedPosition = 0,
+                promptPosition = 0,
+                isEnabled = pipeline.currentEffects().size < FxEffectPipeline.MAX_STAGES,
+                contentDescription = "Add an effect to the chain",
+            )
+            addSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+                override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                    if (position == 0) return
+                    val effect = effects.getOrNull(position - 1) ?: return
+                    pipeline.addStage(effect.id)
                     commitGraph()
                     renderChain()
-                    renderAvailable()
-                }, LinearLayout.LayoutParams(dp(72), ViewGroup.LayoutParams.WRAP_CONTENT))
-                availableContainer.addView(row, matchWrap().apply { topMargin = dp(4); bottomMargin = dp(4) })
+                }
+            }
+            addContainer.addView(spinnerRow(addSpinner, prompt = true), matchWrap())
+            if (pipeline.currentEffects().size >= FxEffectPipeline.MAX_STAGES) {
+                addContainer.addView(TextView(context).apply {
+                    text = "Maximum of ${FxEffectPipeline.MAX_STAGES} effects"
+                    textSize = 11f
+                    setTextColor(SECONDARY_TEXT)
+                    setPadding(dp(10), dp(4), 0, 0)
+                }, matchWrap())
             }
         }
 
         val style = pipeline.lightningSpectrumStyle()
         lightningContainer.addView(TextView(context).apply {
-            text = "Thin antialiased lightning uses seeded random paths and multiple tendrils. Zero-valued bands have zero height."
+            text = "Lightning is composited over the processed artwork. Zero-valued bands have zero height."
             textSize = 12f
+            setTextColor(SECONDARY_TEXT)
         }, matchWrap().apply { bottomMargin = dp(8) })
         fun addSlider(
             title: String,
@@ -160,10 +145,15 @@ internal class FxPipelineEditor(
             update: (LightningSpectrumStyle, Float) -> LightningSpectrumStyle,
         ) {
             val value = initialValue.coerceIn(minimum, maximum)
-            val label = TextView(context).apply { textSize = 12f }
+            val label = TextView(context).apply {
+                textSize = 12f
+                setTextColor(PRIMARY_TEXT)
+            }
             val seek = SeekBar(context).apply {
                 max = 100
                 progress = (((value - minimum) / (maximum - minimum)) * max).toInt().coerceIn(0, max)
+                progressTintList = ColorStateList.valueOf(ACCENT)
+                thumbTintList = ColorStateList.valueOf(ACCENT)
             }
             fun render(progress: Int, apply: Boolean) {
                 val amount = minimum + (maximum - minimum) * progress / seek.max
@@ -192,8 +182,11 @@ internal class FxPipelineEditor(
         addSlider("Idle baseline", 0f, .2f, style.idleHeight, ::number) { current, value -> current.copy(idleHeight = value) }
 
         renderChain()
-        renderAvailable()
-        val scroll = ScrollView(context).apply { addView(content) }
+        val scroll = ScrollView(context).apply {
+            addView(content)
+            isFillViewport = true
+            setBackgroundColor(BACKGROUND)
+        }
         ThemeManager.createDialogBuilder(context)
             .setTitle("FX pipeline editor")
             .setView(scroll)
@@ -201,20 +194,97 @@ internal class FxPipelineEditor(
             .show()
     }
 
-    private fun sectionTitle(text: String) = TextView(context).apply {
-        this.text = text
-        textSize = 16f
-        setPadding(0, 0, 0, 0)
+    private fun styledDropdown(
+        choices: List<String>,
+        selectedPosition: Int,
+        destructivePosition: Int? = null,
+        promptPosition: Int? = null,
+        isEnabled: Boolean = true,
+        contentDescription: String,
+    ) = Spinner(context, Spinner.MODE_DROPDOWN).apply {
+        adapter = FxChoiceAdapter(choices, destructivePosition, promptPosition)
+        setSelection(selectedPosition, false)
+        setPopupBackgroundDrawable(ColorDrawable(POPUP_BACKGROUND))
+        dropDownWidth = ViewGroup.LayoutParams.MATCH_PARENT
+        background = ColorDrawable(Color.TRANSPARENT)
+        setPadding(dp(8), 0, dp(4), 0)
+        this.isEnabled = isEnabled
+        this.contentDescription = contentDescription
     }
 
-    private fun actionButton(text: String, enabled: Boolean = true, action: () -> Unit) = Button(context).apply {
+    private fun spinnerRow(spinner: Spinner, prompt: Boolean = false): LinearLayout {
+        val row = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            minimumHeight = dp(52)
+            background = GradientDrawable().apply {
+                setColor(ROW_BACKGROUND)
+                cornerRadius = dp(8).toFloat()
+                setStroke(dp(1), if (prompt) ACCENT else ROW_BORDER)
+            }
+            alpha = if (spinner.isEnabled) 1f else .58f
+        }
+        row.addView(spinner, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
+        row.addView(TextView(context).apply {
+            text = "▾"
+            textSize = 19f
+            gravity = Gravity.CENTER
+            setTextColor(if (prompt) ACCENT else PRIMARY_TEXT)
+            setOnClickListener { if (spinner.isEnabled) spinner.performClick() }
+        }, LinearLayout.LayoutParams(dp(42), ViewGroup.LayoutParams.MATCH_PARENT))
+        return row
+    }
+
+    private fun sectionTitle(text: String) = TextView(context).apply {
         this.text = text
-        isAllCaps = false
-        isEnabled = enabled
-        setOnClickListener { action() }
+        textSize = 15f
+        typeface = Typeface.DEFAULT_BOLD
+        setTextColor(PRIMARY_TEXT)
     }
 
     private fun matchWrap() = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
 
-    private fun weighted() = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+    private inner class FxChoiceAdapter(
+        private val choices: List<String>,
+        private val destructivePosition: Int?,
+        private val promptPosition: Int?,
+    ) : ArrayAdapter<String>(context, android.R.layout.simple_spinner_item, choices) {
+        override fun getCount(): Int = choices.size
+        override fun getItem(position: Int): String = choices[position]
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View = choiceView(position, convertView, false)
+        override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View = choiceView(position, convertView, true)
+
+        private fun choiceView(position: Int, convertView: View?, inPopup: Boolean): TextView =
+            (convertView as? TextView ?: TextView(context)).apply {
+                text = choices[position]
+                textSize = 14f
+                typeface = if (position == destructivePosition) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+                gravity = Gravity.CENTER_VERTICAL
+                setSingleLine(true)
+                ellipsize = TextUtils.TruncateAt.END
+                setTextColor(when (position) {
+                    destructivePosition -> DELETE_TEXT
+                    promptPosition -> ACCENT
+                    else -> PRIMARY_TEXT
+                })
+                setPadding(dp(12), 0, dp(12), 0)
+                minHeight = dp(if (inPopup) 48 else 52)
+                setBackgroundColor(if (inPopup) POPUP_BACKGROUND else Color.TRANSPARENT)
+                layoutParams = android.widget.AbsListView.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    dp(if (inPopup) 48 else 52),
+                )
+            }
+    }
+
+    private companion object {
+        const val BACKGROUND = 0xFF17191D.toInt()
+        const val ROW_BACKGROUND = 0xFF25282E.toInt()
+        const val POPUP_BACKGROUND = 0xFF25282E.toInt()
+        const val ROW_BORDER = 0xFF4B515B.toInt()
+        const val PRIMARY_TEXT = 0xFFF4F5F7.toInt()
+        const val SECONDARY_TEXT = 0xFFB8BEC8.toInt()
+        const val ACCENT = 0xFF73CFFF.toInt()
+        const val DELETE_TEXT = 0xFFFF8A80.toInt()
+    }
 }
