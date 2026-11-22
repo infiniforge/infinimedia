@@ -140,6 +140,33 @@ class FxPipelineTest {
         assertEquals(30f, (node.parameters.getValue("animationSpeed") as FxParameterValue.FloatValue).value)
     }
 
+    @Test fun effectParametersAreAppliedPerStageAndFollowItemsWhenMoved() {
+        val pipeline = FxEffectPipeline()
+        pipeline.updateStageParameter(0, "zoom", FxParameterValue.FloatValue(1.7f))
+        pipeline.updateStageParameter(1, "mask", FxParameterValue.EnumValue("aperture"))
+
+        var graph = pipeline.graph()
+        assertEquals(
+            1.7f,
+            (graph.nodes.single { it.id == "stage_0" }.parameters.getValue("zoom") as FxParameterValue.FloatValue).value,
+        )
+        assertEquals(
+            "aperture",
+            (graph.nodes.single { it.id == "stage_1" }.parameters.getValue("mask") as FxParameterValue.EnumValue).value,
+        )
+
+        pipeline.moveStage(1, 0)
+        graph = pipeline.graph()
+        assertEquals(
+            "aperture",
+            (graph.nodes.single { it.id == "stage_0" }.parameters.getValue("mask") as FxParameterValue.EnumValue).value,
+        )
+        assertEquals(
+            1.7f,
+            (graph.nodes.single { it.id == "stage_1" }.parameters.getValue("zoom") as FxParameterValue.FloatValue).value,
+        )
+    }
+
     @Test fun existingAnalyzerLevelsMapToNormalizedFxMetadata() {
         val metadata = FxAudioMetadataAdapter.snapshot(
             bands = FloatArray(16) { it / 15f },

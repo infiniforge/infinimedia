@@ -12,15 +12,23 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
+import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import android.widget.Spinner
-import android.widget.TextView
 import android.widget.SeekBar
+import android.widget.Spinner
+import android.widget.Switch
+import android.widget.TextView
 import com.infinifolder.theme.ThemeManager
+import org.infiniforge.fx.api.BuiltinFx
+import org.infiniforge.fx.api.FxEffectDescriptor
+import org.infiniforge.fx.api.FxParameterDescriptor
+import org.infiniforge.fx.api.FxParameterType
+import org.infiniforge.fx.api.FxParameterValue
 import java.util.Locale
+import kotlin.math.roundToInt
 
-/** App-owned effect-chain picker and lightning-visualizer controls. */
+/** App-owned effect-chain picker and descriptor-driven parameter editor. */
 internal class FxPipelineEditor(
     private val context: Context,
     private val pipeline: FxEffectPipeline,
@@ -33,103 +41,32 @@ internal class FxPipelineEditor(
         val effects = pipeline.availableFilters().sortedBy { it.title }
         val content = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(10), dp(16), dp(14))
+            setPadding(dp(12), dp(10), dp(12), dp(14))
             setBackgroundColor(BACKGROUND)
         }
         val chainContainer = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
         val addContainer = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-        val lightningContainer = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-        val lightningTitle = sectionTitle("Lightning spectrum settings")
         val chainTitle = sectionTitle("Effect chain")
 
         content.addView(TextView(context).apply {
-            text = "Choose an effect in each row. Delete is the last choice; Add effect appends a stage."
+            text = "Select an effect, edit its parameters, move it, or delete it. Add effect appends a stage."
             textSize = 12f
             setTextColor(SECONDARY_TEXT)
         }, matchWrap().apply { bottomMargin = dp(10) })
         content.addView(chainTitle, matchWrap().apply { bottomMargin = dp(6) })
         content.addView(chainContainer, matchWrap())
-        content.addView(addContainer, matchWrap().apply { topMargin = dp(8); bottomMargin = dp(14) })
-        content.addView(lightningTitle, matchWrap().apply { bottomMargin = dp(4) })
-        content.addView(lightningContainer, matchWrap())
+        content.addView(addContainer, matchWrap().apply { topMargin = dp(8) })
 
         fun commitGraph() = onGraphChanged()
 
         lateinit var renderAddDropdown: () -> Unit
-        fun renderLightningSettings(isInChain: Boolean) {
-            lightningContainer.removeAllViews()
-            if (!isInChain) {
-                lightningContainer.addView(TextView(context).apply {
-                    text = "Add Lightning spectrum to the chain to configure it."
-                    textSize = 12f
-                    setTextColor(SECONDARY_TEXT)
-                    setPadding(0, dp(4), 0, dp(8))
-                }, matchWrap())
-                return
-            }
-
-            val style = pipeline.lightningSpectrumStyle()
-            lightningContainer.addView(TextView(context).apply {
-                text = "Blended over the image at this chain position. Zero-valued bands have zero height."
-                textSize = 12f
-                setTextColor(SECONDARY_TEXT)
-            }, matchWrap().apply { bottomMargin = dp(8) })
-
-            fun addSlider(
-                title: String,
-                minimum: Float,
-                maximum: Float,
-                initialValue: Float,
-                display: (Float) -> String,
-                update: (LightningSpectrumStyle, Float) -> LightningSpectrumStyle,
-            ) {
-                val value = initialValue.coerceIn(minimum, maximum)
-                val label = TextView(context).apply {
-                    textSize = 12f
-                    setTextColor(PRIMARY_TEXT)
-                }
-                val seek = SeekBar(context).apply {
-                    max = 100
-                    progress = (((value - minimum) / (maximum - minimum)) * max).toInt().coerceIn(0, max)
-                    progressTintList = ColorStateList.valueOf(ACCENT)
-                    thumbTintList = ColorStateList.valueOf(ACCENT)
-                }
-                fun render(progress: Int, apply: Boolean) {
-                    val amount = minimum + (maximum - minimum) * progress / seek.max
-                    label.text = "$title  " + display(amount)
-                    if (apply) {
-                        pipeline.updateLightningSpectrumStyle(update(pipeline.lightningSpectrumStyle(), amount))
-                        commitGraph()
-                    }
-                }
-                render(seek.progress, false)
-                seek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                    override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) =
-                        render(progress, fromUser)
-                    override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
-                    override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
-                })
-                lightningContainer.addView(label, matchWrap())
-                lightningContainer.addView(seek, matchWrap().apply { bottomMargin = dp(4) })
-            }
-
-            fun number(value: Float) = String.format(Locale.US, "%.2f", value)
-            addSlider("Spectrum gain", 0f, 5f, style.gain, ::number) { current, value -> current.copy(gain = value) }
-            addSlider("Maximum height", .1f, 1f, style.maxHeight, { String.format(Locale.US, "%d%%", (it * 100).toInt()) }) { current, value -> current.copy(maxHeight = value) }
-            addSlider("Graph width", .5f, 1f, style.widthScale, { String.format(Locale.US, "%d%%", (it * 100).toInt()) }) { current, value -> current.copy(widthScale = value) }
-            addSlider("Tendrils per bolt", 1f, 8f, style.branchCount.toFloat(), { it.toInt().toString() }) { current, value -> current.copy(branchCount = value.toInt().coerceIn(1, 8)) }
-            addSlider("Lightning speed", 0f, 40f, style.animationSpeed, { String.format(Locale.US, "%d×", it.toInt()) }) { current, value -> current.copy(animationSpeed = value) }
-            addSlider("Electric glow", 0f, 2f, style.glow, ::number) { current, value -> current.copy(glow = value) }
-            addSlider("Idle baseline", 0f, .2f, style.idleHeight, ::number) { current, value -> current.copy(idleHeight = value) }
-        }
-
         fun renderChain() {
             chainContainer.removeAllViews()
             val selected = pipeline.currentEffects()
             chainTitle.text = "Effect chain (${selected.size}/${FxEffectPipeline.MAX_STAGES})"
             if (selected.isEmpty()) {
                 chainContainer.addView(TextView(context).apply {
-                    text = "No filters — artwork passes through."
+                    text = "No effects — artwork passes through."
                     textSize = 13f
                     setTextColor(SECONDARY_TEXT)
                     setPadding(dp(4), dp(8), dp(4), dp(8))
@@ -137,35 +74,51 @@ internal class FxPipelineEditor(
             }
             selected.forEachIndexed { index, effectId ->
                 val selectedIndex = effects.indexOfFirst { it.id == effectId }.coerceAtLeast(0)
-                val choices = effects.map { descriptor ->
-                    "${index + 1}. ${descriptor.title}"
-                } + "Delete effect"
+                val descriptor = effects[selectedIndex]
                 val spinner = styledDropdown(
-                    choices = choices,
+                    choices = effects.map { "${index + 1}. ${it.title}" },
                     selectedPosition = selectedIndex,
-                    destructivePosition = effects.size,
-                    contentDescription = "Effect ${index + 1}: ${effects[selectedIndex].title}",
+                    contentDescription = "Effect ${index + 1}: ${descriptor.title}",
                 )
-                var currentSelection = selectedIndex
                 spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
                     override fun onNothingSelected(parent: AdapterView<*>?) = Unit
                     override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                        if (position == currentSelection) return
-                        if (position == effects.size) {
-                            pipeline.removeStage(index)
-                        } else {
-                            val replacement = effects.getOrNull(position)?.id ?: return
-                            pipeline.replaceStage(index, replacement)
-                            currentSelection = position
-                        }
+                        if (position == selectedIndex) return
+                        val replacement = effects.getOrNull(position)?.id ?: return
+                        pipeline.replaceStage(index, replacement)
                         commitGraph()
                         renderChain()
                     }
                 }
-                chainContainer.addView(spinnerRow(spinner), matchWrap().apply { bottomMargin = dp(8) })
+
+                val row = LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                }
+                row.addView(spinnerRow(spinner), LinearLayout.LayoutParams(0, dp(48), 1f).apply {
+                    marginEnd = dp(2)
+                })
+                row.addView(iconButton("✏️", "Edit ${descriptor.title}") {
+                    showStageEditor(index, descriptor, ::commitGraph)
+                }, iconLayoutParams())
+                row.addView(iconButton("⬆️", "Move ${descriptor.title} up", enabled = index > 0) {
+                    pipeline.moveStage(index, index - 1)
+                    commitGraph()
+                    renderChain()
+                }, iconLayoutParams())
+                row.addView(iconButton("⬇️", "Move ${descriptor.title} down", enabled = index < selected.lastIndex) {
+                    pipeline.moveStage(index, index + 1)
+                    commitGraph()
+                    renderChain()
+                }, iconLayoutParams())
+                row.addView(iconButton("🗑️", "Delete ${descriptor.title}", destructive = true) {
+                    pipeline.removeStage(index)
+                    commitGraph()
+                    renderChain()
+                }, iconLayoutParams())
+                chainContainer.addView(row, matchWrap().apply { bottomMargin = dp(8) })
             }
             renderAddDropdown()
-            renderLightningSettings(selected.any { it == "generator:lightning-spectrum" })
         }
 
         renderAddDropdown = {
@@ -199,7 +152,6 @@ internal class FxPipelineEditor(
             }
         }
 
-
         renderChain()
         val scroll = ScrollView(context).apply {
             addView(content)
@@ -211,6 +163,205 @@ internal class FxPipelineEditor(
             .setView(scroll)
             .setPositiveButton("Done", null)
             .show()
+    }
+
+    private fun showStageEditor(index: Int, descriptor: FxEffectDescriptor, onChanged: () -> Unit) {
+        val content = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            setBackgroundColor(BACKGROUND)
+        }
+        content.addView(TextView(context).apply {
+            text = descriptor.description
+            textSize = 13f
+            setTextColor(SECONDARY_TEXT)
+        }, matchWrap().apply { bottomMargin = dp(12) })
+
+        if (descriptor.parameters.isEmpty()) {
+            content.addView(TextView(context).apply {
+                text = "This effect has no adjustable parameters."
+                textSize = 13f
+                setTextColor(SECONDARY_TEXT)
+            }, matchWrap())
+        } else {
+            val current = pipeline.stageParameters(index)
+            descriptor.parameters.forEach { parameter ->
+                val value = current.getValue(parameter.name)
+                when (parameter.type) {
+                    FxParameterType.FLOAT, FxParameterType.INT -> addNumericParameter(
+                        content, index, parameter, value, onChanged,
+                    )
+                    FxParameterType.BOOLEAN -> addBooleanParameter(
+                        content, index, parameter, value as FxParameterValue.BoolValue, onChanged,
+                    )
+                    FxParameterType.ENUM -> addEnumParameter(
+                        content, index, parameter, value as FxParameterValue.EnumValue, onChanged,
+                    )
+                    FxParameterType.VECTOR -> content.addView(TextView(context).apply {
+                        text = "${prettyName(parameter.name)}: vector editor is not available yet."
+                        textSize = 12f
+                        setTextColor(SECONDARY_TEXT)
+                    }, matchWrap().apply { bottomMargin = dp(8) })
+                }
+            }
+        }
+        val scroll = ScrollView(context).apply {
+            addView(content)
+            isFillViewport = true
+            setBackgroundColor(BACKGROUND)
+        }
+        ThemeManager.createDialogBuilder(context)
+            .setTitle(descriptor.title)
+            .setView(scroll)
+            .setPositiveButton("Done", null)
+            .show()
+    }
+
+    private fun addNumericParameter(
+        parent: LinearLayout,
+        index: Int,
+        parameter: FxParameterDescriptor,
+        initial: FxParameterValue,
+        onChanged: () -> Unit,
+    ) {
+        val minimum = parameter.minimum ?: 0f
+        val maximum = parameter.maximum ?: 1f
+        if (maximum <= minimum) return
+        val isInteger = parameter.type == FxParameterType.INT
+        val steps = if (isInteger) (maximum - minimum).roundToInt().coerceAtLeast(1) else 100
+        val label = TextView(context).apply {
+            textSize = 12f
+            setTextColor(PRIMARY_TEXT)
+        }
+        val seek = SeekBar(context).apply {
+            max = steps
+            progressTintList = ColorStateList.valueOf(ACCENT)
+            thumbTintList = ColorStateList.valueOf(ACCENT)
+            progress = ((((initial.asFloat() - minimum) / (maximum - minimum)) * steps).roundToInt())
+                .coerceIn(0, steps)
+        }
+        fun render(progress: Int, apply: Boolean) {
+            val raw = minimum + (maximum - minimum) * progress / steps
+            val value = if (isInteger) {
+                FxParameterValue.IntValue(raw.roundToInt())
+            } else {
+                FxParameterValue.FloatValue(raw)
+            }
+            val formatted = if (isInteger) raw.roundToInt().toString() else String.format(Locale.US, "%.2f", raw)
+            val units = parameter.units?.takeIf { it.isNotBlank() }?.let { " $it" }.orEmpty()
+            label.text = "${prettyName(parameter.name)}  $formatted$units\n${parameter.description}"
+            if (apply) {
+                pipeline.updateStageParameter(index, parameter.name, value)
+                onChanged()
+            }
+        }
+        render(seek.progress, false)
+        seek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) = render(progress, fromUser)
+            override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+            override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
+        })
+        parent.addView(label, matchWrap())
+        parent.addView(seek, matchWrap().apply { bottomMargin = dp(8) })
+    }
+
+    private fun addBooleanParameter(
+        parent: LinearLayout,
+        index: Int,
+        parameter: FxParameterDescriptor,
+        initial: FxParameterValue.BoolValue,
+        onChanged: () -> Unit,
+    ) {
+        val toggle = Switch(context).apply {
+            text = prettyName(parameter.name)
+            textSize = 13f
+            setTextColor(PRIMARY_TEXT)
+            isChecked = initial.value
+            contentDescription = "${prettyName(parameter.name)}. ${parameter.description}"
+            setOnCheckedChangeListener { _, checked ->
+                pipeline.updateStageParameter(index, parameter.name, FxParameterValue.BoolValue(checked))
+                onChanged()
+            }
+        }
+        parent.addView(toggle, matchWrap())
+        parent.addView(TextView(context).apply {
+            text = parameter.description
+            textSize = 11f
+            setTextColor(SECONDARY_TEXT)
+        }, matchWrap().apply { bottomMargin = dp(8) })
+    }
+
+    private fun addEnumParameter(
+        parent: LinearLayout,
+        index: Int,
+        parameter: FxParameterDescriptor,
+        initial: FxParameterValue.EnumValue,
+        onChanged: () -> Unit,
+    ) {
+        parent.addView(TextView(context).apply {
+            text = "${prettyName(parameter.name)} — ${parameter.description}"
+            textSize = 12f
+            setTextColor(PRIMARY_TEXT)
+        }, matchWrap().apply { bottomMargin = dp(4) })
+        var selected = parameter.enumValues.indexOf(initial.value).coerceAtLeast(0)
+        val spinner = styledDropdown(
+            choices = parameter.enumValues,
+            selectedPosition = selected,
+            contentDescription = "${prettyName(parameter.name)}: ${initial.value}",
+        )
+        spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                if (position == selected) return
+                val choice = parameter.enumValues.getOrNull(position) ?: return
+                selected = position
+                pipeline.updateStageParameter(index, parameter.name, FxParameterValue.EnumValue(choice))
+                onChanged()
+            }
+        }
+        parent.addView(spinnerRow(spinner), matchWrap().apply { bottomMargin = dp(10) })
+    }
+
+    private fun FxParameterValue.asFloat(): Float = when (this) {
+        is FxParameterValue.FloatValue -> value
+        is FxParameterValue.IntValue -> value.toFloat()
+        else -> error("Expected a numeric parameter value")
+    }
+
+    private fun prettyName(name: String): String = name
+        .replace(Regex("([a-z])([A-Z])"), "$1 $2")
+        .replaceFirstChar { it.uppercase(Locale.US) }
+
+    private fun iconButton(
+        glyph: String,
+        label: String,
+        enabled: Boolean = true,
+        destructive: Boolean = false,
+        onClick: () -> Unit,
+    ) = Button(context).apply {
+        text = glyph
+        textSize = 17f
+        isAllCaps = false
+        minWidth = 0
+        minimumWidth = 0
+        minHeight = 0
+        minimumHeight = 0
+        gravity = Gravity.CENTER
+        setPadding(0, 0, 0, 0)
+        setTextColor(if (destructive) DELETE_TEXT else PRIMARY_TEXT)
+        background = GradientDrawable().apply {
+            setColor(ROW_BACKGROUND)
+            cornerRadius = dp(7).toFloat()
+            setStroke(dp(1), if (destructive) DELETE_TEXT else ROW_BORDER)
+        }
+        alpha = if (enabled) 1f else .38f
+        isEnabled = enabled
+        contentDescription = label
+        setOnClickListener { if (isEnabled) onClick() }
+    }
+
+    private fun iconLayoutParams() = LinearLayout.LayoutParams(dp(38), dp(42)).apply {
+        marginStart = dp(2)
     }
 
     private fun styledDropdown(
@@ -226,7 +377,7 @@ internal class FxPipelineEditor(
         setPopupBackgroundDrawable(ColorDrawable(POPUP_BACKGROUND))
         dropDownWidth = ViewGroup.LayoutParams.MATCH_PARENT
         background = ColorDrawable(Color.TRANSPARENT)
-        setPadding(dp(8), 0, dp(4), 0)
+        setPadding(dp(4), 0, dp(2), 0)
         this.isEnabled = isEnabled
         this.contentDescription = contentDescription
     }
@@ -235,7 +386,7 @@ internal class FxPipelineEditor(
         val row = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            minimumHeight = dp(52)
+            minimumHeight = dp(48)
             background = GradientDrawable().apply {
                 setColor(ROW_BACKGROUND)
                 cornerRadius = dp(8).toFloat()
@@ -250,7 +401,7 @@ internal class FxPipelineEditor(
             gravity = Gravity.CENTER
             setTextColor(if (prompt) ACCENT else PRIMARY_TEXT)
             setOnClickListener { if (spinner.isEnabled) spinner.performClick() }
-        }, LinearLayout.LayoutParams(dp(42), ViewGroup.LayoutParams.MATCH_PARENT))
+        }, LinearLayout.LayoutParams(dp(30), ViewGroup.LayoutParams.MATCH_PARENT))
         return row
     }
 
@@ -286,12 +437,12 @@ internal class FxPipelineEditor(
                     promptPosition -> ACCENT
                     else -> PRIMARY_TEXT
                 })
-                setPadding(dp(12), 0, dp(12), 0)
-                minHeight = dp(if (inPopup) 48 else 52)
+                setPadding(dp(10), 0, dp(10), 0)
+                minHeight = dp(if (inPopup) 48 else 48)
                 setBackgroundColor(if (inPopup) POPUP_BACKGROUND else Color.TRANSPARENT)
                 layoutParams = android.widget.AbsListView.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
-                    dp(if (inPopup) 48 else 52),
+                    dp(48),
                 )
             }
     }

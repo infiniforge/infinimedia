@@ -38,8 +38,9 @@ in the host window ([Android SurfaceView documentation](https://developer.androi
 The FxEffectPipeline executes an ordered user-editable chain. Its default order
 is timestamp-animated, tempo-smoothed distort:rotozoom, display:crt, then
 distort:water-refraction, followed by generator:lightning-spectrum. The FX
-editor lists available filters and every active chain item as a dark dropdown. Each dropdown offers all image-chain effects and
-ends with Delete; the Add effect dropdown appears below the chain. The chain may
+editor lists available filters and every active chain item as a dark dropdown. Each
+stage also has ✏️ edit, ⬆️ up, ⬇️ down, and 🗑️ delete buttons. Edit opens controls
+generated from the effect's parameter descriptors; Add effect appears below the chain. The chain may
 contain zero through twelve items, and its selection persists when the playlist
 changes. Fire and lightning are generator stages explicitly alpha-composited
 over the accumulated image at their chain position. Lightning spectrum is
@@ -270,15 +271,15 @@ driver/runtime behavior remain **not verified on device**.
 
 ### Editable image-effect chain — 2026-11-21
 
-The FX editor shows the current ordered chain as a vertical list of dark
-dropdowns. Each dropdown lists the available libinfinifx image effects, with
-Delete as its final option. A separate Add effect dropdown sits below the chain.
+The FX editor shows the current ordered chain as dark stage rows. Each row has
+an effect dropdown and ✏️, ⬆️, ⬇️, and 🗑️ buttons. Edit opens the selected effect's
+declared parameters; Add effect sits below the chain.
 The chain accepts zero through twelve stages; the starting selection is
 rotozoom, CRT, water refraction, and lightning spectrum, and it remains selected across track
 changes. Fire and lightning spectrum are generator stages with explicit alpha
 blending at their chain positions. Lightning is included last by default and can
-be replaced or deleted. Per-effect parameter editing and saved recipes
-are still future work; the lightning sliders configure its chain node.
+be replaced or deleted. Stage parameters are editable from each row; saved
+recipes remain future work.
 
 InfiniMedia pins libinfinifx commit
 `73291cfa9607f2b11885e5ef739ada88e2df854b`.
@@ -331,3 +332,18 @@ The latest verification passed `ANDROID_HOME="$HOME/android-sdk" ./gradlew
 --max-workers=1 --console=plain`, which assembled `InfiniMedia-debug.apk`. No
 Android device was connected, so the editor and rendered placement are not
 verified on device.
+
+
+### FX row actions and parameter editor — 2026-11-21
+
+Each stage row has an effect dropdown and UTF-8/emoji buttons for edit (✏️), up
+(⬆️), down (⬇️), and delete (🗑️). Edit generates controls from the built-in
+effect descriptor: sliders for numeric values, dropdowns for enums, and switches
+for booleans. Values belong to each individual stage and travel with it when the
+user changes its order. The graph receives the updated stage parameters.
+
+`ANDROID_HOME="$HOME/android-sdk" ./gradlew :viewer-audio:testDebugUnitTest
+--no-daemon --max-workers=1 --console=plain` passed 136 tests (0 failures, 0
+errors, 0 skipped). `ANDROID_HOME="$HOME/android-sdk" ./build.sh --max-workers=1
+--console=plain` assembled `InfiniMedia-debug.apk`. No device was connected; the
+editor layout and its interactive behavior remain not verified on device.
