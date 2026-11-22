@@ -47,8 +47,8 @@ Each chain row is a dropdown whose final choice deletes that stage; an Add
 effect dropdown at the bottom appends stages up to 12 total. The selected chain
 persists when the visual playlist item changes.
 Fire and lightning are generator stages with explicit alpha composition.
-Lightning is included last by default but can be moved, replaced, or deleted like
-any other chain item. The spectrum generator maps the normalized 16 PCM bands to
+Lightning is included last by default and can be replaced or deleted like any
+other chain item. The spectrum generator maps the normalized 16 PCM bands to
 thin antialiased electric lightning spanning the full output width and height by
 default; seeded random paths grow six tendrils and short twigs per trace. No filled bar boxes are drawn. Lightning colors use the artwork's top detected palette colors; present zero-valued bands have zero height. Its full-width segmented fallback is anchored at the
 pane's bottom edge until the first GPU frame swaps successfully, and
@@ -273,7 +273,7 @@ InfiniMedia now pins libinfinifx commit
 `73291cfa9607f2b11885e5ef739ada88e2df854b`. The FX editor lists the available
 filters/effects and current ordered chain. Each chain dropdown lists available effects and ends with Delete; an Add effect
 dropdown is at the bottom (up to 12 stages). The selection survives track changes. Lightning spectrum is
-the default final generator item and can be reordered or removed. `:viewer-audio:testDebugUnitTest` passed
+the default final generator item and can be replaced or removed. `:viewer-audio:testDebugUnitTest` passed
 135 tests, and `ANDROID_HOME="$HOME/android-sdk" ./build.sh --max-workers=1 --console=plain` assembled
 `InfiniMedia-debug.apk`. The library's portable tests, shader-source validation,
 and AAR/sample build also passed. No Android device was attached, so updated

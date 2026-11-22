@@ -43,7 +43,7 @@ ends with Delete; the Add effect dropdown appears below the chain. The chain may
 contain zero through twelve items, and its selection persists when the playlist
 changes. Fire and lightning are generator stages explicitly alpha-composited
 over the accumulated image at their chain position. Lightning spectrum is
-included last by default but can be moved, replaced, or deleted. An empty image
+included last by default and can be replaced or deleted. An empty image
 chain is a source bypass and has no hidden lightning stage.
 
 The default chain is rotozoom, CRT, water refraction, and lightning spectrum.
@@ -277,7 +277,7 @@ The chain accepts zero through twelve stages; the starting selection is
 rotozoom, CRT, water refraction, and lightning spectrum, and it remains selected across track
 changes. Fire and lightning spectrum are generator stages with explicit alpha
 blending at their chain positions. Lightning is included last by default and can
-be moved, replaced, or deleted. Per-effect parameter editing and saved recipes
+be replaced or deleted. Per-effect parameter editing and saved recipes
 are still future work; the lightning sliders configure its chain node.
 
 InfiniMedia pins libinfinifx commit
