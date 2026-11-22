@@ -14,10 +14,10 @@ The media pane runs libinfinifx over album art and static images. Artwork fills
 the pane with a centered crop by default. Square art on a 16:9 pane is fitted to
 pane width; its Y begins 7/32 of the pane width above the top edge, cropping
 7/32 from each vertical edge. The editable chain initially contains album-art
-rotozoom, CRT, and water refraction. Each row is a dropdown for replacing that
-effect or deleting it; an Add effect dropdown at the bottom appends stages up to
-a 12-stage total. The graph finishes with a full-width, full-height
-lightning-spectrum layer. Its antialiased bright core is about 1.4 output pixels
+rotozoom, CRT, water refraction, and lightning spectrum. Lightning is a normal
+generator stage that alpha-composites over the current image at its chain
+position. Each row is a dropdown for replacing that effect or deleting it; an
+Add effect dropdown at the bottom appends stages up to a 12-stage total. Its antialiased bright core is about 1.4 output pixels
 at nominal scale, with seeded random motion and six side tendrils plus shorter
 twigs per trace by default. It draws no filled bar boxes; its colors cycle
 through the eight most popular colors detected from a deterministic six-bit RGB
@@ -46,9 +46,11 @@ The FX editor lists the available library effects and the active ordered chain.
 Each chain row is a dropdown whose final choice deletes that stage; an Add
 effect dropdown at the bottom appends stages up to 12 total. The selected chain
 persists when the visual playlist item changes.
-Fire is added as a generated layer with explicit alpha composition. The lightning
-spectrum remains a separate always-on overlay. The spectrum generator maps the normalized 16 PCM
-bands to thin antialiased electric lightning spanning the full output width and height by default; seeded random paths grow six tendrils and short twigs per trace. No filled bar boxes are drawn. Lightning colors use the artwork's top detected palette colors; present zero-valued bands have zero height. Its full-width segmented fallback is anchored at the
+Fire and lightning are generator stages with explicit alpha composition.
+Lightning is included last by default but can be moved, replaced, or deleted like
+any other chain item. The spectrum generator maps the normalized 16 PCM bands to
+thin antialiased electric lightning spanning the full output width and height by
+default; seeded random paths grow six tendrils and short twigs per trace. No filled bar boxes are drawn. Lightning colors use the artwork's top detected palette colors; present zero-valued bands have zero height. Its full-width segmented fallback is anchored at the
 pane's bottom edge until the first GPU frame swaps successfully, and
 returns if the graph cannot render. Tap the
 visual pane to reveal EDIT FX beside the full-screen button. The editor shows the active chain and available filters, with dark dropdowns
@@ -270,9 +272,9 @@ performance acceptance remain outstanding; see
 InfiniMedia now pins libinfinifx commit
 `73291cfa9607f2b11885e5ef739ada88e2df854b`. The FX editor lists the available
 filters/effects and current ordered chain. Each chain dropdown lists available effects and ends with Delete; an Add effect
-dropdown is at the bottom (up to 12 stages). The selection survives track changes. The lightning-spectrum
-layer remains an independent overlay. `:viewer-audio:testDebugUnitTest` passed
-134 tests, and `./build.sh --no-daemon --max-workers=1 --console=plain` assembled
+dropdown is at the bottom (up to 12 stages). The selection survives track changes. Lightning spectrum is
+the default final generator item and can be reordered or removed. `:viewer-audio:testDebugUnitTest` passed
+135 tests, and `ANDROID_HOME="$HOME/android-sdk" ./build.sh --max-workers=1 --console=plain` assembled
 `InfiniMedia-debug.apk`. The library's portable tests, shader-source validation,
 and AAR/sample build also passed. No Android device was attached, so updated
 lightning appearance and the editor's on-device layout remain unverified.
@@ -286,7 +288,8 @@ advance independent rotation phases from monotonic render timestamps, cap each
 update to 100 ms, and keep moving without audio metadata. Their defaults are
 1.0 and 0.8 rad/s at 120 BPM, with bounded optional tempo/audio modulation.
 The FX chain editor uses dark per-stage dropdowns, with Delete last and Add
-below the chain; lightning remains a separate overlay after the image pipeline.
+below the chain; lightning is a selectable generator stage, appended by default
+and blended at that stage's position.
 The library passed 30 unit tests, its shader-source validator, and its standalone
 AAR/sample build. InfiniMedia passed 135 viewer-audio tests and assembled the
 APK with ANDROID_HOME="$HOME/android-sdk" ./build.sh --max-workers=1

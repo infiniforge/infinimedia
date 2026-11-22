@@ -18,11 +18,13 @@ or Infiniscribe as Gradle projects and does not import their application source.
   Its TextureView-backed `FxArtworkView` owns an EGL/GLES render thread and bitmap
   texture lifecycle, preserving normal Android child-view composition.
   FxEffectPipeline owns an ordered, user-editable image-effect chain (default:
-  rotozoom, CRT, water refraction). Its editor uses one dropdown per chain item,
-  with Delete as the final choice, plus an Add effect dropdown at the bottom (up
-  to 12 items). Choices persist across track changes. It then alpha-composites a
-  full-output lightning-spectrum layer
-  with 20×-speed seeded-random antialiased bolts, six tendrils and shorter twigs
+  rotozoom, CRT, water refraction, lightning spectrum). Generator effects are
+  explicitly alpha-composited over the image accumulated at their chain
+  position. Lightning is the default final generator stage. Its editor uses one
+  dropdown per chain item, with Delete as the final choice, plus an Add effect
+  dropdown at the bottom (up to 12 items). Choices persist across track changes.
+  The full-output lightning-spectrum generator renders
+  20×-speed seeded-random antialiased bolts, six tendrils and shorter twigs
   per trace by default, and no filled bar bodies. The bolts cycle through up to eight popular colors from artwork sampled on a deterministic 32×32 grid and quantized to six-bit RGB (two bits per channel), with duplicate bins merged and ranked by frequency. Zero-valued bands have zero height. A player-owned
   metadata label sits above the full-pane effect stack. libinfinisound supplies
   estimated tempo and low-band transient events through the existing PCM

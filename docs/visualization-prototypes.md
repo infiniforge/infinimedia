@@ -33,22 +33,22 @@ artwork can sit between the underlying album-art ImageView and the existing
 title/spectrum overlays. The spectrum fallback is hidden only after the first
 successful `eglSwapBuffers`. This replaces a SurfaceView configured as a media
 overlay, whose special surface z-order could place it behind ordinary content
-in the host window ([Android SurfaceView documentation](https://developer.android.com/reference/android/view/SurfaceView)). If an image-effect graph fails, the host retries the lightning generator alone through libinfinifx and logs the original error. The original artwork remains visible underneath the transparent output; the full-width segmented spectrum fallback stays available until a rendered frame has successfully swapped and returns if the lightning-only graph also fails.
+in the host window ([Android SurfaceView documentation](https://developer.android.com/reference/android/view/SurfaceView)). If an image-effect graph fails while lightning is in the chain, the host retries that generator alone through libinfinifx and logs the original error. The original artwork remains visible underneath the transparent output; the full-width segmented spectrum fallback stays available until a rendered frame has successfully swapped and returns if the configured graph and any eligible lightning-only retry fail.
 
 The FxEffectPipeline executes an ordered user-editable chain. Its default order
 is timestamp-animated, tempo-smoothed distort:rotozoom, display:crt, then
-distort:water-refraction. The FX editor lists available filters and every active
-chain item as a dark dropdown. Each dropdown offers all image-chain effects and
+distort:water-refraction, followed by generator:lightning-spectrum. The FX
+editor lists available filters and every active chain item as a dark dropdown. Each dropdown offers all image-chain effects and
 ends with Delete; the Add effect dropdown appears below the chain. The chain may
 contain zero through twelve items, and its selection persists when the playlist
-changes. Fire is a generator inserted as an
-explicit alpha-composited layer. The lightning-spectrum generator remains a
-separate, always-on overlay above the processed artwork. An empty image chain
-passes the album art through to that overlay.
+changes. Fire and lightning are generator stages explicitly alpha-composited
+over the accumulated image at their chain position. Lightning spectrum is
+included last by default but can be moved, replaced, or deleted. An empty image
+chain is a source bypass and has no hidden lightning stage.
 
-The default chain is rotozoom, CRT, and water refraction. Available options
-include pass-through, CRT, LCD, rotozoom, kaleidoscope, water refraction, heat
-ripple, and the fire layer. Graph validation and the renderer's effect contracts
+The default chain is rotozoom, CRT, water refraction, and lightning spectrum.
+Available options include pass-through, CRT, LCD, rotozoom, kaleidoscope, water
+refraction, heat ripple, fire, and lightning spectrum. Graph validation and the renderer's effect contracts
 remain in libinfinifx; UI and selection state are app-owned. The editor also
 controls lightning gain, height, width (default 100%), tendrils, speed, glow, and
 idle baseline, applying changes to the active graph as the controls move.
@@ -274,11 +274,11 @@ The FX editor shows the current ordered chain as a vertical list of dark
 dropdowns. Each dropdown lists the available libinfinifx image effects, with
 Delete as its final option. A separate Add effect dropdown sits below the chain.
 The chain accepts zero through twelve stages; the starting selection is
-rotozoom, CRT, and water refraction, and it remains selected across track
-changes. Fire is represented as an independent
-generator layer with explicit alpha blending. Lightning spectrum remains a
-separate overlay. Per-effect parameter editing and saved recipes are still
-future work; the current sliders continue to control the lightning overlay.
+rotozoom, CRT, water refraction, and lightning spectrum, and it remains selected across track
+changes. Fire and lightning spectrum are generator stages with explicit alpha
+blending at their chain positions. Lightning is included last by default and can
+be moved, replaced, or deleted. Per-effect parameter editing and saved recipes
+are still future work; the lightning sliders configure its chain node.
 
 InfiniMedia pins libinfinifx commit
 `73291cfa9607f2b11885e5ef739ada88e2df854b`.
@@ -310,3 +310,24 @@ python3 scripts/fetch-dependencies.py --check passed. The standalone build
 ANDROID_HOME="$HOME/android-sdk" ./build.sh --max-workers=1 --console=plain
 assembled the APK and passed all 135 viewer-audio tests. No Android device was
 attached, so the animation is not verified on device.
+
+
+### Lightning as an editable chain stage — 2026-11-21
+
+The lightning-spectrum generator is now selectable like any other effect and is
+included as the default final chain item. The graph creates its transparent
+generator node at the selected stage and connects it to an explicit alpha blend
+with the image produced by preceding stages. Later filters process that composite
+normally. Removing lightning leaves no implicit generator or fallback overlay;
+the empty chain is a source bypass. Its existing sliders configure the chain
+generator. Graph tests cover stage order, explicit blend inputs, moving/removing
+the generator, and the empty-chain bypass.
+
+The latest verification passed `ANDROID_HOME="$HOME/android-sdk" ./gradlew
+:viewer-audio:compileDebugKotlin --rerun-tasks --no-daemon --max-workers=1
+--console=plain`, `ANDROID_HOME="$HOME/android-sdk" ./gradlew
+:viewer-audio:testDebugUnitTest --no-daemon --max-workers=1 --console=plain`
+(135 tests; 0 failures), and `ANDROID_HOME="$HOME/android-sdk" ./build.sh
+--max-workers=1 --console=plain`, which assembled `InfiniMedia-debug.apk`. No
+Android device was connected, so the editor and rendered placement are not
+verified on device.

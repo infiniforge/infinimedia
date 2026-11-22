@@ -1,62 +1,104 @@
 package com.infinifolder.viewer
 
 import org.infiniforge.fx.api.BuiltinFx
+import org.infiniforge.fx.api.FxEffectCategory
 import org.infiniforge.fx.api.FxGraph
 import org.infiniforge.fx.api.FxGraphValidator
 import org.infiniforge.fx.api.FxParameterValue
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FxPipelineTest {
     @Test fun editorCanReplaceAddReorderAndRemoveAnyStage() {
         val pipeline = FxEffectPipeline()
-        assertEquals(listOf("distort:rotozoom", "display:crt", "distort:water-refraction"), pipeline.currentEffects())
+        assertEquals(
+            listOf(
+                "distort:rotozoom",
+                "display:crt",
+                "distort:water-refraction",
+                "generator:lightning-spectrum",
+            ),
+            pipeline.currentEffects(),
+        )
         assertTrue(pipeline.availableFilters().any { it.id == "distort:kaleidoscope" })
+        assertTrue(pipeline.availableFilters().any { it.id == "generator:lightning-spectrum" })
 
         pipeline.replaceStage(1, "display:lcd")
         pipeline.moveStage(2, 0)
         pipeline.addStage("distort:kaleidoscope")
-        assertEquals(listOf("distort:water-refraction", "distort:rotozoom", "display:lcd", "distort:kaleidoscope"), pipeline.currentEffects())
+        assertEquals(
+            listOf(
+                "distort:water-refraction",
+                "distort:rotozoom",
+                "display:lcd",
+                "generator:lightning-spectrum",
+                "distort:kaleidoscope",
+            ),
+            pipeline.currentEffects(),
+        )
         assertEquals("display:lcd", pipeline.removeStage(2))
-        assertEquals(listOf("distort:water-refraction", "distort:rotozoom", "distort:kaleidoscope"), pipeline.currentEffects())
+        assertEquals(
+            listOf(
+                "distort:water-refraction",
+                "distort:rotozoom",
+                "generator:lightning-spectrum",
+                "distort:kaleidoscope",
+            ),
+            pipeline.currentEffects(),
+        )
         pipeline.addStage("generator:fire")
         assertValidGraph(pipeline.graph())
     }
 
-    @Test fun lightningRemainsASeparateOverlayAboveTheImageChain() {
+    @Test fun lightningIsASelectableChainStageAndBlendsAtItsPosition() {
         val pipeline = FxEffectPipeline()
-        assertFalse(pipeline.availableFilters().any { it.id == "generator:lightning-spectrum" })
         val graph = pipeline.graph()
-        val outputBlend = graph.nodes.single { it.id == graph.outputNodeId }
-        assertEquals("composite:blend", outputBlend.effectId)
-        assertEquals(
-            "lightning_spectrum",
-            graph.connections.single { it.toNodeId == outputBlend.id && it.inputPort == "overlay" }.fromNodeId,
-        )
+        val lightning = graph.nodes.single { it.effectId == "generator:lightning-spectrum" }
+        val blendEdge = graph.connections.single { it.fromNodeId == lightning.id && it.inputPort == "overlay" }
+        val blend = graph.nodes.single { it.id == blendEdge.toNodeId }
+
+        assertEquals("stage_3_generator", lightning.id)
+        assertEquals("stage_3_blend", blend.id)
+        assertEquals("composite:blend", blend.effectId)
         assertEquals(
             "stage_2",
-            graph.connections.single { it.toNodeId == outputBlend.id && it.inputPort == "base" }.fromNodeId,
+            graph.connections.single { it.toNodeId == blend.id && it.inputPort == "base" }.fromNodeId,
         )
-        assertValidGraph(graph)
+        assertEquals(blend.id, graph.outputNodeId)
+
+        pipeline.moveStage(3, 1)
+        val moved = pipeline.graph()
+        val movedGenerator = moved.nodes.single { it.effectId == "generator:lightning-spectrum" }
+        assertEquals("stage_1_generator", movedGenerator.id)
+        assertEquals(
+            "stage_0",
+            moved.connections.single { it.toNodeId == "stage_1_blend" && it.inputPort == "base" }.fromNodeId,
+        )
+
+        pipeline.removeStage(1)
+        assertTrue(pipeline.graph().nodes.none { it.effectId == "generator:lightning-spectrum" })
+        assertValidGraph(pipeline.graph())
     }
 
-    @Test fun emptyChainPassesArtworkThroughToLightningOverlay() {
+    @Test fun emptyChainPassesArtworkThroughWithoutAHiddenLightningGenerator() {
         val pipeline = FxEffectPipeline()
         while (pipeline.currentEffects().isNotEmpty()) pipeline.removeStage(0)
         val graph = pipeline.graph()
-        assertEquals(FxGraph.SOURCE_NODE_ID, graph.connections.first { it.toNodeId == "lightning_blend" }.fromNodeId)
-        assertEquals("generator:lightning-spectrum", graph.nodes.single { it.id == "lightning_spectrum" }.effectId)
-        assertValidGraph(graph)
+        assertEquals(FxGraph.SOURCE_NODE_ID, graph.outputNodeId)
+        assertTrue(graph.nodes.isEmpty())
+        assertTrue(graph.connections.isEmpty())
+        assertEquals(null, graph.lightningOnlyFallback())
+        FxGraphValidator.validate(graph, BuiltinFx.byId)
     }
 
     @Test fun chainRejectsInvalidIdsPositionsAndMoreThanMaximumStages() {
         val pipeline = FxEffectPipeline()
-        try { pipeline.replaceStage(0, "generator:lightning-spectrum"); throw AssertionError("overlay should not be a chain filter") }
+        try { pipeline.replaceStage(0, "composite:blend"); throw AssertionError("compositor should not be a chain item") }
         catch (_: IllegalArgumentException) { }
         try { pipeline.removeStage(8); throw AssertionError("out-of-range removal should fail") }
         catch (_: IllegalArgumentException) { }
+        pipeline.replaceStage(0, "generator:lightning-spectrum")
         while (pipeline.currentEffects().size < FxEffectPipeline.MAX_STAGES) pipeline.addStage("core:passthrough")
         assertValidGraph(pipeline.graph())
         try { pipeline.addStage("core:passthrough"); throw AssertionError("chain cap should be enforced") }
@@ -64,7 +106,7 @@ class FxPipelineTest {
     }
 
     @Test fun lightningSpectrumKeepsExpectedDefaultsAndZeroFreeIdleBaseline() {
-        val node = FxEffectPipeline().graph().nodes.single { it.id == "lightning_spectrum" }
+        val node = FxEffectPipeline().graph().nodes.single { it.effectId == "generator:lightning-spectrum" }
         assertEquals(1f, (node.parameters.getValue("widthScale") as FxParameterValue.FloatValue).value)
         assertEquals(1f, (node.parameters.getValue("maxHeight") as FxParameterValue.FloatValue).value)
         assertEquals(1f, (node.parameters.getValue("gain") as FxParameterValue.FloatValue).value)
@@ -73,19 +115,24 @@ class FxPipelineTest {
         assertEquals(.14f, (node.parameters.getValue("idleHeight") as FxParameterValue.FloatValue).value)
     }
 
-    @Test fun lightningOnlyFallbackIsAValidGeneratorGraphAndKeepsStyle() {
+    @Test fun lightningOnlyFallbackIsValidAndUsesTheChainGeneratorsStyle() {
         val graph = FxEffectPipeline().graph()
         val fallback = requireNotNull(graph.lightningOnlyFallback())
         FxGraphValidator.validate(fallback, BuiltinFx.byId)
         assertEquals("generator:lightning-spectrum", fallback.nodes.single().effectId)
         assertEquals("lightning_fallback", fallback.outputNodeId)
-        assertEquals(graph.nodes.single { it.id == "lightning_spectrum" }.parameters, fallback.nodes.single().parameters)
+        assertEquals(
+            graph.nodes.single { it.effectId == "generator:lightning-spectrum" }.parameters,
+            fallback.nodes.single().parameters,
+        )
     }
 
-    @Test fun lightningEditorParametersReachTheGeneratorNode() {
+    @Test fun lightningEditorParametersReachItsChainGeneratorNode() {
         val pipeline = FxEffectPipeline()
-        pipeline.updateLightningSpectrumStyle(LightningSpectrumStyle(gain = 3.4f, maxHeight = .72f, widthScale = .76f, branchCount = 7, animationSpeed = 30f, glow = 1.2f))
-        val node = pipeline.graph().nodes.single { it.id == "lightning_spectrum" }
+        pipeline.updateLightningSpectrumStyle(
+            LightningSpectrumStyle(gain = 3.4f, maxHeight = .72f, widthScale = .76f, branchCount = 7, animationSpeed = 30f, glow = 1.2f),
+        )
+        val node = pipeline.graph().nodes.single { it.effectId == "generator:lightning-spectrum" }
         assertEquals(3.4f, (node.parameters.getValue("gain") as FxParameterValue.FloatValue).value)
         assertEquals(.72f, (node.parameters.getValue("maxHeight") as FxParameterValue.FloatValue).value)
         assertEquals(.76f, (node.parameters.getValue("widthScale") as FxParameterValue.FloatValue).value)
@@ -113,7 +160,9 @@ class FxPipelineTest {
 
     private fun assertValidGraph(graph: FxGraph) {
         FxGraphValidator.validate(graph, BuiltinFx.byId)
-        assertTrue(graph.nodes.any { it.id == "lightning_spectrum" })
-        assertTrue(graph.connections.any { it.fromNodeId == "lightning_spectrum" && it.inputPort == "overlay" })
+        graph.nodes.filter { BuiltinFx.byId.getValue(it.effectId).category == FxEffectCategory.GENERATOR }.forEach { generator ->
+            val overlay = graph.connections.single { it.fromNodeId == generator.id && it.inputPort == "overlay" }
+            assertEquals("composite:blend", graph.nodes.single { it.id == overlay.toNodeId }.effectId)
+        }
     }
 }

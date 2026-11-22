@@ -1777,7 +1777,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
                 setColor(0xD9000000.toInt())
                 setStroke(dp(1), 0x9979DFFF.toInt())
             }
-            contentDescription = "Edit visual effect chain and lightning overlay"
+            contentDescription = "Edit visual effect chain"
             visibility = View.GONE
             setOnClickListener { showFxPipelineEditor() }
         }

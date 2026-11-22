@@ -39,22 +39,90 @@ internal class FxPipelineEditor(
         val chainContainer = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
         val addContainer = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
         val lightningContainer = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+        val lightningTitle = sectionTitle("Lightning spectrum settings")
         val chainTitle = sectionTitle("Effect chain")
 
         content.addView(TextView(context).apply {
-            text = "Choose an effect in each row. Delete is the last choice."
+            text = "Choose an effect in each row. Delete is the last choice; Add effect appends a stage."
             textSize = 12f
             setTextColor(SECONDARY_TEXT)
         }, matchWrap().apply { bottomMargin = dp(10) })
         content.addView(chainTitle, matchWrap().apply { bottomMargin = dp(6) })
         content.addView(chainContainer, matchWrap())
         content.addView(addContainer, matchWrap().apply { topMargin = dp(8); bottomMargin = dp(14) })
-        content.addView(sectionTitle("Lightning overlay"), matchWrap().apply { bottomMargin = dp(4) })
+        content.addView(lightningTitle, matchWrap().apply { bottomMargin = dp(4) })
         content.addView(lightningContainer, matchWrap())
 
         fun commitGraph() = onGraphChanged()
 
         lateinit var renderAddDropdown: () -> Unit
+        fun renderLightningSettings(isInChain: Boolean) {
+            lightningContainer.removeAllViews()
+            if (!isInChain) {
+                lightningContainer.addView(TextView(context).apply {
+                    text = "Add Lightning spectrum to the chain to configure it."
+                    textSize = 12f
+                    setTextColor(SECONDARY_TEXT)
+                    setPadding(0, dp(4), 0, dp(8))
+                }, matchWrap())
+                return
+            }
+
+            val style = pipeline.lightningSpectrumStyle()
+            lightningContainer.addView(TextView(context).apply {
+                text = "Blended over the image at this chain position. Zero-valued bands have zero height."
+                textSize = 12f
+                setTextColor(SECONDARY_TEXT)
+            }, matchWrap().apply { bottomMargin = dp(8) })
+
+            fun addSlider(
+                title: String,
+                minimum: Float,
+                maximum: Float,
+                initialValue: Float,
+                display: (Float) -> String,
+                update: (LightningSpectrumStyle, Float) -> LightningSpectrumStyle,
+            ) {
+                val value = initialValue.coerceIn(minimum, maximum)
+                val label = TextView(context).apply {
+                    textSize = 12f
+                    setTextColor(PRIMARY_TEXT)
+                }
+                val seek = SeekBar(context).apply {
+                    max = 100
+                    progress = (((value - minimum) / (maximum - minimum)) * max).toInt().coerceIn(0, max)
+                    progressTintList = ColorStateList.valueOf(ACCENT)
+                    thumbTintList = ColorStateList.valueOf(ACCENT)
+                }
+                fun render(progress: Int, apply: Boolean) {
+                    val amount = minimum + (maximum - minimum) * progress / seek.max
+                    label.text = "$title  " + display(amount)
+                    if (apply) {
+                        pipeline.updateLightningSpectrumStyle(update(pipeline.lightningSpectrumStyle(), amount))
+                        commitGraph()
+                    }
+                }
+                render(seek.progress, false)
+                seek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) =
+                        render(progress, fromUser)
+                    override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+                    override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
+                })
+                lightningContainer.addView(label, matchWrap())
+                lightningContainer.addView(seek, matchWrap().apply { bottomMargin = dp(4) })
+            }
+
+            fun number(value: Float) = String.format(Locale.US, "%.2f", value)
+            addSlider("Spectrum gain", 0f, 5f, style.gain, ::number) { current, value -> current.copy(gain = value) }
+            addSlider("Maximum height", .1f, 1f, style.maxHeight, { String.format(Locale.US, "%d%%", (it * 100).toInt()) }) { current, value -> current.copy(maxHeight = value) }
+            addSlider("Graph width", .5f, 1f, style.widthScale, { String.format(Locale.US, "%d%%", (it * 100).toInt()) }) { current, value -> current.copy(widthScale = value) }
+            addSlider("Tendrils per bolt", 1f, 8f, style.branchCount.toFloat(), { it.toInt().toString() }) { current, value -> current.copy(branchCount = value.toInt().coerceIn(1, 8)) }
+            addSlider("Lightning speed", 0f, 40f, style.animationSpeed, { String.format(Locale.US, "%d×", it.toInt()) }) { current, value -> current.copy(animationSpeed = value) }
+            addSlider("Electric glow", 0f, 2f, style.glow, ::number) { current, value -> current.copy(glow = value) }
+            addSlider("Idle baseline", 0f, .2f, style.idleHeight, ::number) { current, value -> current.copy(idleHeight = value) }
+        }
+
         fun renderChain() {
             chainContainer.removeAllViews()
             val selected = pipeline.currentEffects()
@@ -97,6 +165,7 @@ internal class FxPipelineEditor(
                 chainContainer.addView(spinnerRow(spinner), matchWrap().apply { bottomMargin = dp(8) })
             }
             renderAddDropdown()
+            renderLightningSettings(selected.any { it == "generator:lightning-spectrum" })
         }
 
         renderAddDropdown = {
@@ -130,56 +199,6 @@ internal class FxPipelineEditor(
             }
         }
 
-        val style = pipeline.lightningSpectrumStyle()
-        lightningContainer.addView(TextView(context).apply {
-            text = "Lightning is composited over the processed artwork. Zero-valued bands have zero height."
-            textSize = 12f
-            setTextColor(SECONDARY_TEXT)
-        }, matchWrap().apply { bottomMargin = dp(8) })
-        fun addSlider(
-            title: String,
-            minimum: Float,
-            maximum: Float,
-            initialValue: Float,
-            display: (Float) -> String,
-            update: (LightningSpectrumStyle, Float) -> LightningSpectrumStyle,
-        ) {
-            val value = initialValue.coerceIn(minimum, maximum)
-            val label = TextView(context).apply {
-                textSize = 12f
-                setTextColor(PRIMARY_TEXT)
-            }
-            val seek = SeekBar(context).apply {
-                max = 100
-                progress = (((value - minimum) / (maximum - minimum)) * max).toInt().coerceIn(0, max)
-                progressTintList = ColorStateList.valueOf(ACCENT)
-                thumbTintList = ColorStateList.valueOf(ACCENT)
-            }
-            fun render(progress: Int, apply: Boolean) {
-                val amount = minimum + (maximum - minimum) * progress / seek.max
-                label.text = "$title  ${display(amount)}"
-                if (apply) {
-                    pipeline.updateLightningSpectrumStyle(update(pipeline.lightningSpectrumStyle(), amount))
-                    commitGraph()
-                }
-            }
-            render(seek.progress, false)
-            seek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) = render(progress, fromUser)
-                override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
-                override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
-            })
-            lightningContainer.addView(label, matchWrap())
-            lightningContainer.addView(seek, matchWrap().apply { bottomMargin = dp(4) })
-        }
-        fun number(value: Float) = String.format(Locale.US, "%.2f", value)
-        addSlider("Spectrum gain", 0f, 5f, style.gain, ::number) { current, value -> current.copy(gain = value) }
-        addSlider("Maximum height", .1f, 1f, style.maxHeight, { "${(it * 100).toInt()}%" }) { current, value -> current.copy(maxHeight = value) }
-        addSlider("Graph width", .5f, 1f, style.widthScale, { "${(it * 100).toInt()}%" }) { current, value -> current.copy(widthScale = value) }
-        addSlider("Tendrils per bolt", 1f, 8f, style.branchCount.toFloat(), { it.toInt().toString() }) { current, value -> current.copy(branchCount = value.toInt().coerceIn(1, 8)) }
-        addSlider("Lightning speed", 0f, 40f, style.animationSpeed, { "${it.toInt()}×" }) { current, value -> current.copy(animationSpeed = value) }
-        addSlider("Electric glow", 0f, 2f, style.glow, ::number) { current, value -> current.copy(glow = value) }
-        addSlider("Idle baseline", 0f, .2f, style.idleHeight, ::number) { current, value -> current.copy(idleHeight = value) }
 
         renderChain()
         val scroll = ScrollView(context).apply {

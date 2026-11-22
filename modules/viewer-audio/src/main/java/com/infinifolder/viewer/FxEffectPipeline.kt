@@ -8,13 +8,18 @@ import org.infiniforge.fx.api.FxGraph
 import org.infiniforge.fx.api.FxNode
 import org.infiniforge.fx.api.FxParameterValue
 
-/** App-owned, ordered image-effect chain with an always-on spectrum overlay. */
+/** App-owned, ordered image-effect chain. Generator stages blend over the current image. */
 internal class FxEffectPipeline {
     private val selectableEffects = BuiltinFx.descriptors.filter { descriptor ->
-        descriptor.category != FxEffectCategory.COMPOSITOR && descriptor.id != "generator:lightning-spectrum"
+        descriptor.category != FxEffectCategory.COMPOSITOR
     }
     private val selectableIds = selectableEffects.mapTo(HashSet()) { it.id }
-    private val stages = mutableListOf("distort:rotozoom", "display:crt", "distort:water-refraction")
+    private val stages = mutableListOf(
+        "distort:rotozoom",
+        "display:crt",
+        "distort:water-refraction",
+        "generator:lightning-spectrum",
+    )
     private var graphRevision = 0L
     private var lightningStyle = LightningSpectrumStyle()
 
@@ -72,10 +77,24 @@ internal class FxEffectPipeline {
         val connections = mutableListOf<FxConnection>()
         var current = FxGraph.SOURCE_NODE_ID
         stages.forEachIndexed { index, effectId ->
-            if (effectId == "generator:fire") {
+            val descriptor = BuiltinFx.byId.getValue(effectId)
+            if (descriptor.category == FxEffectCategory.GENERATOR) {
                 val generator = "stage_${index}_generator"
                 val blend = "stage_${index}_blend"
-                nodes += FxNode(generator, effectId)
+                val parameters = if (effectId == "generator:lightning-spectrum") {
+                    mapOf(
+                        "gain" to FxParameterValue.FloatValue(lightningStyle.gain),
+                        "maxHeight" to FxParameterValue.FloatValue(lightningStyle.maxHeight),
+                        "widthScale" to FxParameterValue.FloatValue(lightningStyle.widthScale),
+                        "branchCount" to FxParameterValue.IntValue(lightningStyle.branchCount),
+                        "animationSpeed" to FxParameterValue.FloatValue(lightningStyle.animationSpeed),
+                        "glow" to FxParameterValue.FloatValue(lightningStyle.glow),
+                        "idleHeight" to FxParameterValue.FloatValue(lightningStyle.idleHeight),
+                    )
+                } else {
+                    emptyMap()
+                }
+                nodes += FxNode(generator, effectId, parameters)
                 nodes += FxNode(blend, "composite:blend")
                 connections += FxConnection(current, blend, "base")
                 connections += FxConnection(generator, blend, "overlay")
@@ -87,29 +106,11 @@ internal class FxEffectPipeline {
                 current = node
             }
         }
-        val spectrum = "lightning_spectrum"
-        val blend = "lightning_blend"
-        nodes += FxNode(
-            spectrum,
-            "generator:lightning-spectrum",
-            parameters = mapOf(
-                "gain" to FxParameterValue.FloatValue(lightningStyle.gain),
-                "maxHeight" to FxParameterValue.FloatValue(lightningStyle.maxHeight),
-                "widthScale" to FxParameterValue.FloatValue(lightningStyle.widthScale),
-                "branchCount" to FxParameterValue.IntValue(lightningStyle.branchCount),
-                "animationSpeed" to FxParameterValue.FloatValue(lightningStyle.animationSpeed),
-                "glow" to FxParameterValue.FloatValue(lightningStyle.glow),
-                "idleHeight" to FxParameterValue.FloatValue(lightningStyle.idleHeight),
-            ),
-        )
-        nodes += FxNode(blend, "composite:blend")
-        connections += FxConnection(current, blend, "base")
-        connections += FxConnection(spectrum, blend, "overlay")
         return FxGraph(
             name = "infinimedia-fx-$graphRevision",
             nodes = nodes,
             connections = connections,
-            outputNodeId = blend,
+            outputNodeId = current,
         )
     }
 
