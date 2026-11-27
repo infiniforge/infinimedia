@@ -51,6 +51,23 @@ class FxPipelineTest {
         assertValidGraph(pipeline.graph())
     }
 
+    @Test fun kaleidoscopeConsumesThePreviousChainStageOutput() {
+        val pipeline = FxEffectPipeline()
+        pipeline.replaceStage(1, "distort:kaleidoscope")
+        val graph = pipeline.graph()
+
+        assertEquals(
+            FxGraph.SOURCE_NODE_ID,
+            graph.connections.single { it.toNodeId == "stage_0" && it.inputPort == "image" }.fromNodeId,
+        )
+        assertEquals(
+            "stage_0",
+            graph.connections.single { it.toNodeId == "stage_1" && it.inputPort == "image" }.fromNodeId,
+        )
+        assertEquals("distort:kaleidoscope", graph.nodes.single { it.id == "stage_1" }.effectId)
+        assertValidGraph(graph)
+    }
+
     @Test fun lightningIsASelectableChainStageAndBlendsAtItsPosition() {
         val pipeline = FxEffectPipeline()
         val graph = pipeline.graph()

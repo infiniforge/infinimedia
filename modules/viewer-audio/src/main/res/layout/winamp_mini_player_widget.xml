@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="top|start"
+    android:orientation="vertical">
+
+    <FrameLayout
+        android:id="@+id/widget_player_frame"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start">
+
+        <ImageView
+            android:id="@+id/widget_player_skin"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:adjustViewBounds="true"
+            android:contentDescription="@string/winamp_mini_player_widget_label"
+            android:scaleType="fitCenter" />
+
+        <!-- Native 275px coordinates: title x=32..156; transport starts at x=166. -->
+        <LinearLayout
+            android:id="@+id/widget_player_actions"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/widget_open_logo"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="10"
+                android:contentDescription="@string/winamp_widget_open_player"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <ImageView
+                android:id="@+id/widget_title_start_gap"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="22"
+                android:contentDescription="@string/winamp_widget_open_player"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <TextView
+                android:id="@+id/widget_open_title"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="124"
+                android:contentDescription="@string/winamp_widget_open_player"
+                android:ellipsize="marquee"
+                android:fadingEdgeLength="1px"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:focusedByDefault="true"
+                android:gravity="center_vertical|start"
+                android:includeFontPadding="false"
+                android:marqueeRepeatLimit="-1"
+                android:requiresFadingEdge="none"
+                android:scrollHorizontally="true"
+                android:singleLine="true"
+                android:textColor="@android:color/white"
+                android:textSize="8sp"
+                android:typeface="monospace"
+                android:clickable="true" />
+
+            <ImageView
+                android:id="@+id/widget_title_end_gap"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="10"
+                android:contentDescription="@string/winamp_widget_open_player"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <ImageView
+                android:id="@+id/widget_previous"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="12"
+                android:contentDescription="@string/winamp_widget_previous"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <ImageView
+                android:id="@+id/widget_play"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="12"
+                android:contentDescription="@string/winamp_widget_play_pause"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <ImageView
+                android:id="@+id/widget_pause"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="12"
+                android:contentDescription="@string/winamp_widget_play_pause"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <ImageView
+                android:id="@+id/widget_stop"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="12"
+                android:contentDescription="@string/winamp_widget_stop"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <ImageView
+                android:id="@+id/widget_next"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="12"
+                android:contentDescription="@string/winamp_widget_next"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <ImageView
+                android:id="@+id/widget_eject"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="12"
+                android:contentDescription="@string/winamp_widget_open_player"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <ImageView
+                android:id="@+id/widget_open_gap"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="2"
+                android:contentDescription="@string/winamp_widget_open_player"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <ImageView
+                android:id="@+id/widget_open_window_buttons"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="35"
+                android:contentDescription="@string/winamp_widget_open_player"
+                android:clickable="true"
+                android:focusable="true" />
+        </LinearLayout>
+    </FrameLayout>
+</LinearLayout>

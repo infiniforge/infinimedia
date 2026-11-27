@@ -24,4 +24,4 @@ their reusable audio, video, and GPU effects APIs.
 
 - [InfiniForge ecosystem map](ECOSYSTEM.md) — generated overview; synchronized from the organization manifest.
 
-- [Planned playlist ownership migration](TODO.md).
+- [Playlist generation and directory handoff](TODO.md).

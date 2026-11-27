@@ -83,6 +83,7 @@ internal class AudioPlaylistStore(context: Context) {
                 .putNullable("channels", track.channels)
                 .put("isBitrateRelevant", track.isBitrateRelevant)
                 .put("fileName", track.fileName)
+                .putNullable("filePath", track.filePath)
                 .put("isUnreadable", track.isUnreadable)
                 .putNullable("decoderExtension", track.decoderExtension)
                 .putNullable("sourceReference", sourceLocation)
@@ -138,6 +139,7 @@ internal class AudioPlaylistStore(context: Context) {
                 channels = item.intOrNull("channels"),
                 isBitrateRelevant = item.optBoolean("isBitrateRelevant", true),
                 fileName = itemName,
+                filePath = item.stringOrNull("filePath"),
                 isUnreadable = item.optBoolean("isUnreadable", false),
                 decoderExtension = item.stringOrNull("decoderExtension"),
                 sourceReference = sourceReference,

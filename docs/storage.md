@@ -12,7 +12,9 @@ URIs and do not persist temporary Infinifolder relay links.
 2. InfiniMedia uses the public `libinfiniselect` API to retain and resolve
    resource references, including references handled by Infinifolder.
 3. When installed, Infinifolder supplies the optional storage provider and owns
-   its remote, archive, filesystem-image, and credential implementations.
+   its remote, archive, filesystem-image, and credential implementations. Media
+   uses the public `FolderStorage.list` API to enumerate handed-off directories;
+   each playable child is resolved to a current content URI only when needed.
 
 The client does not package Infinifolder's storage engine or access its private
 files. If the provider is missing, disabled, or denies a request, the app keeps

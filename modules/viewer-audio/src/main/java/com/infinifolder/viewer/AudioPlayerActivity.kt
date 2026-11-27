@@ -63,8 +63,6 @@ import io.github.gretchycat.infiniselect.InfiniSelect
 import io.github.gretchycat.infiniselect.FileSelectionContract
 import io.github.gretchycat.infiniselect.MultipleSelectionDelivery
 import io.github.gretchycat.infiniselect.OpenRequest
-import io.github.gretchycat.infiniselect.SelectionMetadataFormat
-import io.github.gretchycat.infiniselect.SelectionItem
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
@@ -412,7 +410,10 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
             fxArtworkView.onPause()
         }
         if (::visualizerView.isInitialized) visualizerView.updateData(FloatArray(16))
-        if (::visualPaneVisualizerView.isInitialized) visualPaneVisualizerView.updateData(FloatArray(16))
+        if (::visualPaneVisualizerView.isInitialized) {
+            visualPaneVisualizerView.isPlaying = false
+            if (visualPaneVisualizerView.visibility == View.VISIBLE) visualPaneVisualizerView.updateData(FloatArray(16))
+        }
         super.onPause()
     }
 
@@ -422,7 +423,12 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
         if (!isPlayerResumed || (!CastManager.isCasting && sessionId <= 0) || source == null) {
             visualizerBridge?.detach()
             if (::visualizerView.isInitialized) visualizerView.updateData(FloatArray(16))
-            if (::visualPaneVisualizerView.isInitialized) visualPaneVisualizerView.updateData(FloatArray(16))
+            if (::visualPaneVisualizerView.isInitialized) {
+                visualPaneVisualizerView.isPlaying = false
+                if (visualPaneVisualizerView.visibility == View.VISIBLE) {
+                    visualPaneVisualizerView.updateData(FloatArray(16))
+                }
+            }
             return
         }
         visualizerBridge?.attach(source) {
@@ -486,51 +492,38 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
         selectedPlaylistIndices.clear()
         hasExplicitPlaylistSelection = false
         retainPersistableReadGrants(intent)
-        if (intent?.action == Intent.ACTION_SEND_MULTIPLE) {
+        val directoryMimeHint = intent?.getStringExtra("mimeType") ?: intent?.type
+            ?: intent?.data?.let { runCatching { contentResolver.getType(it) }.getOrNull() }
+        val directoryAccessUri = intent?.getStringExtra(FileSelectionContract.EXTRA_RESULT_DIRECTORY)
+            ?.takeIf(String::isNotBlank)?.let(Uri::parse)
+            ?: intent?.data?.takeIf { directoryMimeHint == android.provider.DocumentsContract.Document.MIME_TYPE_DIR }
+        if (intent?.action == Intent.ACTION_SEND_MULTIPLE && directoryAccessUri == null) {
             val streams = intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM).orEmpty()
             if (streams.isNotEmpty()) {
-                val authoritative = intent.getStringArrayListExtra(FileSelectionContract.EXTRA_RESULT_AUTHORITATIVE_URIS)
-                    ?: intent.getStringArrayListExtra(FileSelectionContract.EXTRA_RESULT_SOURCE_REFERENCES).orEmpty()
-                val names = intent.getStringArrayListExtra(FileSelectionContract.EXTRA_RESULT_NAMES).orEmpty()
-                val mimes = intent.getStringArrayListExtra(FileSelectionContract.EXTRA_RESULT_MIMES).orEmpty()
-                val items = streams.mapIndexed { index, contentUri ->
-                    val identity = authoritative.getOrNull(index)?.takeIf(String::isNotBlank)
-                        ?: InfiniSelect.authoritativeCandidate(null, contentUri)?.toString()
-                        ?: throw IllegalArgumentException("A selected media item is missing its authoritative URI")
-                    val queriedName = runCatching {
-                        contentResolver.query(contentUri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
-                            null, null, null)?.use { cursor ->
-                            if (!cursor.moveToFirst()) null else cursor.getString(0)
-                        }
-                    }.getOrNull()
-                    SelectionItem(
-                        uri = contentUri,
-                        name = names.getOrNull(index)?.takeIf(String::isNotBlank)
-                            ?: queriedName ?: contentUri.lastPathSegment.orEmpty(),
-                        mimeType = mimes.getOrNull(index)?.takeIf(String::isNotBlank)
-                            ?: contentResolver.getType(contentUri) ?: "application/octet-stream",
-                        sourceReference = identity,
-                    )
-                }
-                val playlist = InfiniSelect.createJspfPlaylist(this, items, "Selection.jspf")
-                val generated = Intent(intent).apply {
-                    action = Intent.ACTION_VIEW
-                    setDataAndType(playlist, InfiniSelect.JSPF_MIME)
-                    putExtra("displayName", "Selection.jspf")
-                    putExtra("mimeType", InfiniSelect.JSPF_MIME)
-                    putExtra(FileSelectionContract.EXTRA_RESULT_AUTHORITATIVE_URI, playlist.toString())
-                }
-                handleIntent(generated)
+                loadSharedMedia(intent, streams)
                 return
             }
         }
-        val requestedUri = intent?.data ?: intent?.getStringExtra("uri")?.let { Uri.parse(it) }
+        val requestedUri = directoryAccessUri ?: intent?.data ?: intent?.getStringExtra("uri")?.let { Uri.parse(it) }
         if (requestedUri == null) {
             val restoreIntent = Intent(this, AudioPlayerService::class.java).apply {
                 action = AudioPlayerService.ACTION_RESTORE
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(restoreIntent)
             else startService(restoreIntent)
+            return
+        }
+        if (directoryAccessUri != null || directoryMimeHint == android.provider.DocumentsContract.Document.MIME_TYPE_DIR) {
+            val directoryUri = directoryAccessUri ?: requestedUri
+            val directoryReference = intent?.getStringExtra(FileSelectionContract.EXTRA_RESULT_DIRECTORY_REFERENCE)
+                ?: intent?.getStringExtra(FileSelectionContract.EXTRA_RESULT_AUTHORITATIVE_URI)
+                ?: directoryUri.toString()
+            val directoryName = intent?.getStringExtra(FileSelectionContract.EXTRA_RESULT_DIRECTORY_NAME)
+                ?.takeIf(String::isNotBlank)
+                ?: intent?.getStringExtra("displayName")?.removePrefix("Media from ")?.takeIf(String::isNotBlank)
+                ?: "Media directory"
+            val playlistTitle = intent?.getStringExtra("displayName")?.takeIf(String::isNotBlank) ?: directoryName
+            loadDirectoryPlaylist(directoryUri, Uri.parse(directoryReference), playlistTitle, directoryName)
             return
         }
         val requestedReference = intent?.getStringExtra(FileSelectionContract.EXTRA_RESULT_AUTHORITATIVE_URI)
@@ -642,6 +635,120 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
         }.start()
     }
 
+    private fun loadSharedMedia(intent: Intent, streams: List<Uri>) {
+        val generation = playlistLoadGeneration.incrementAndGet()
+        val authoritative = intent.getStringArrayListExtra(FileSelectionContract.EXTRA_RESULT_AUTHORITATIVE_URIS)
+            ?: intent.getStringArrayListExtra(FileSelectionContract.EXTRA_RESULT_SOURCE_REFERENCES).orEmpty()
+        val names = intent.getStringArrayListExtra(FileSelectionContract.EXTRA_RESULT_NAMES).orEmpty()
+        val mimes = intent.getStringArrayListExtra(FileSelectionContract.EXTRA_RESULT_MIMES).orEmpty()
+        Thread {
+            val tracks = mutableListOf<AudioTrack>()
+            val visitedPlaylists = mutableSetOf<String>()
+            for ((index, contentUri) in streams.withIndex()) {
+                if (generation != playlistLoadGeneration.get()) return@Thread
+                val name = names.getOrNull(index)?.takeIf(String::isNotBlank)
+                    ?: runCatching {
+                        contentResolver.query(contentUri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+                            null, null, null)?.use { cursor ->
+                            if (cursor.moveToFirst()) cursor.getString(0) else null
+                        }
+                    }.getOrNull() ?: contentUri.lastPathSegment.orEmpty()
+                val mime = mimes.getOrNull(index)?.takeIf(String::isNotBlank)
+                    ?: runCatching { contentResolver.getType(contentUri) }.getOrNull()
+                    ?: "application/octet-stream"
+                val reference = authoritative.getOrNull(index)?.takeIf(String::isNotBlank)
+                    ?: InfiniSelect.authoritativeCandidate(null, contentUri)?.toString()
+                    ?: continue
+                val source = runCatching {
+                    InfiniSelect.requireSelectedSource(this, contentUri, reference, name, mime)
+                }.getOrNull() ?: continue
+                if (PlaylistExpander.isPlaylist(name, mime)) {
+                    tracks += PlaylistExpander.expandPlaylist(this, source.contentUri, visitedPlaylists,
+                        authoritativePlaylistUri = source.authoritativeUri)
+                    continue
+                }
+                val kind = when {
+                    AnsiPlaybackSupport.isAnsiFile(name, mime) -> PlaylistMediaKind.ANSI
+                    else -> when (MediaTypeDetector.detect(name, mime)) {
+                        MediaType.VIDEO -> PlaylistMediaKind.VIDEO
+                        MediaType.IMAGE -> PlaylistMediaKind.IMAGE
+                        else -> PlaylistMediaKind.AUDIO
+                    }
+                }
+                tracks += AudioTrack(source.contentUri, name, fileName = name,
+                    sourceReference = source.authoritativeUri.toString(), mediaKind = kind, sourceMimeType = mime)
+            }
+            runOnUiThread {
+                if (generation == playlistLoadGeneration.get()) {
+                    replacePlaylistFromGeneratedTracks(tracks, generation, "No readable media was selected", preservePlaylistOrder = true)
+                }
+            }
+        }.start()
+    }
+
+    private fun loadDirectoryPlaylist(
+        directoryAccessUri: Uri,
+        directoryReference: Uri,
+        title: String,
+        directoryName: String,
+    ) {
+        val generation = playlistLoadGeneration.incrementAndGet()
+        Toast.makeText(this, "Scanning directory for media…", Toast.LENGTH_SHORT).show()
+        Thread {
+            val outcome = runCatching { DirectoryPlaylistGenerator.generate(this, directoryReference, directoryName) }
+            if (generation != playlistLoadGeneration.get()) return@Thread
+            runOnUiThread {
+                if (generation != playlistLoadGeneration.get() || isFinishing || isDestroyed) return@runOnUiThread
+                outcome.fold(
+                    { result ->
+                        com.infinifolder.storage.DiagnosticLog.record(
+                            "audio.playlist.directory-generated",
+                            "title=$title folders=${result.foldersVisited} tracks=${result.tracks.size} skipped=${result.unavailableItems} truncated=${result.truncated}")
+                        if (result.truncated || result.unavailableItems > 0) {
+                            val detail = if (result.truncated) "scan limit reached" else "some items were unavailable"
+                            Toast.makeText(this, "Queued ${result.tracks.size} items; $detail", Toast.LENGTH_LONG).show()
+                        }
+                        replacePlaylistFromGeneratedTracks(result.tracks, generation,
+                            "No supported audio, video, or image files were found", preservePlaylistOrder = true)
+                    },
+                    { error ->
+                        com.infinifolder.storage.DiagnosticLog.record(
+                            "audio.playlist.directory-scan.failed", "directory=$directoryAccessUri", error)
+                        Toast.makeText(this, "Could not scan this directory: ${error.message ?: "unavailable"}",
+                            Toast.LENGTH_LONG).show()
+                    },
+                )
+            }
+        }.start()
+    }
+
+    private fun replacePlaylistFromGeneratedTracks(
+        tracks: List<AudioTrack>,
+        generation: Long,
+        emptyMessage: String,
+        preservePlaylistOrder: Boolean = false,
+    ) {
+        if (tracks.isEmpty()) {
+            Toast.makeText(this, emptyMessage, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val serviceIntent = Intent(this, AudioPlayerService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(serviceIntent)
+        else startService(serviceIntent)
+        fun applyPlaylist(attempt: Int) {
+            if (generation != playlistLoadGeneration.get() || isFinishing || isDestroyed) return
+            val service = AudioPlayerService.currentService
+            if (service == null) {
+                if (attempt < 30) window.decorView.postDelayed({ applyPlaylist(attempt + 1) }, 100)
+                else Toast.makeText(this, "The media queue could not be started", Toast.LENGTH_LONG).show()
+                return
+            }
+            service.setPlaylist(tracks, 0, preservePlaylistOrder = preservePlaylistOrder)
+            updateUIFromService(service)
+        }
+        applyPlaylist(0)
+    }
+
     private fun openMediaSelection() {
         if (isFinishing || isDestroyed) return
         playlistSelectionPending = true
@@ -668,9 +775,8 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
             allowMultiple = true,
             supportedExtensions = extensions,
             hideUnsupported = extensions.isNotEmpty(),
-            multipleSelectionDelivery = MultipleSelectionDelivery.JSPF,
-            metadataFormat = SelectionMetadataFormat.XML,
-            // The recursive scan applies these MIME and extension filters to all media types.
+            multipleSelectionDelivery = MultipleSelectionDelivery.ITEM_URIS,
+            // Media assembles its own queue from the selected resource identities.
             allowRecursiveAudioDirectories = true,
             progressReceiver = object : android.os.ResultReceiver(Handler(Looper.getMainLooper())) {
                 override fun onReceiveResult(resultCode: Int, resultData: Bundle?) {
@@ -1683,8 +1789,8 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
         }
         artCard.addView(fxArtworkView, FrameLayout.LayoutParams(-1, -1))
 
-        // The lower-third background hugs its text; the spectrum remains a
-        // separate prototype overlay.
+        // The lower-third background hugs its text. Legacy spectrum bars are a
+        // failure/startup fallback and stop updating once GL has swapped a frame.
         visualPaneMetadata = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
@@ -1728,8 +1834,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
         })
         fxArtworkView.onRenderAvailabilityChanged = { available ->
             fxRenderAvailable = available
-            val isAudioPane = AudioPlayerService.currentService?.currentTrack?.mediaKind == PlaylistMediaKind.AUDIO && !isShowingAnsiOverlay
-            visualPaneVisualizerView.visibility = if (isAudioPane && !available) View.VISIBLE else View.GONE
+            refreshVisualPaneFallback()
         }
         artCard.addOnLayoutChangeListener { _, left, _, right, _, _, _, _, _ ->
             val textMax = ((right - left) * 0.72f).toInt().coerceAtLeast(dp(80))
@@ -2026,7 +2131,9 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
                 else AudioPlayerService.currentService?.isPlaying == true
             visualizerBridge?.getSpectrum(visualizerBands, isPlaying = playing)
             if (::visualizerView.isInitialized) visualizerView.updateData(visualizerBands)
-            if (::visualPaneVisualizerView.isInitialized) visualPaneVisualizerView.updateData(visualizerBands)
+            if (::visualPaneVisualizerView.isInitialized && visualPaneVisualizerView.visibility == View.VISIBLE) {
+                visualPaneVisualizerView.updateData(visualizerBands)
+            }
             if (::fxArtworkView.isInitialized) {
                 if (playing) {
                     val vu = FloatArray(4)
@@ -2527,7 +2634,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
                         row.setBackgroundColor(theme.alternateBackground)
                         val image = row.getChildAt(0) as? ImageView
                         if (image != null) bindDirectoryImage(image, displayRow.track, dp(40))
-                        (row.getChildAt(1) as? TextView)?.text = displayRow.track.directoryName.orEmpty()
+                        (row.getChildAt(1) as? TextView)?.text = directoryDisplayName(displayRow.track)
                     }
                     is PlaylistDisplayRow.Track -> {
                         val index = displayRow.index
@@ -2569,7 +2676,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
                             orientation = LinearLayout.HORIZONTAL
                             gravity = Gravity.CENTER_VERTICAL
                             setPadding(dp(8), dp(4), dp(8), dp(4))
-                            contentDescription = "Directory image for ${track.directoryName.orEmpty()}. Tap to show it above."
+                            contentDescription = "Directory image for ${directoryDisplayName(track)}. Tap to show it above."
                             tag = "directory-image"
                             isClickable = true
                             isFocusable = true
@@ -2582,7 +2689,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
                         bindDirectoryImage(image, track, dp(40))
                         row.addView(image, LinearLayout.LayoutParams(dp(40), dp(40)))
                         row.addView(TextView(this).apply {
-                            text = track.directoryName.orEmpty()
+                            text = directoryDisplayName(track)
                             textSize = 12f
                             typeface = Typeface.DEFAULT_BOLD
                             setTextColor(theme.textPrimary)
@@ -2780,6 +2887,12 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
         }
         return rows
     }
+
+    private fun directoryDisplayName(track: AudioTrack): String =
+        track.album?.takeIf(String::isNotBlank)
+            ?: track.directoryName?.takeIf(String::isNotBlank)
+            ?: track.filePath?.substringBeforeLast('/', "")?.takeIf(String::isNotBlank)
+            ?: "Media directory"
 
     private fun directoryEntryBitmap(track: AudioTrack, sizePx: Int): Bitmap? =
         track.directoryArtwork ?: iconThemeManager.resolveFolderIcon(track.directoryName.orEmpty(), sizePx)
@@ -3822,10 +3935,27 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
         progressFramePosted = false
     }
 
+    private fun refreshVisualPaneFallback() {
+        if (!::visualPaneVisualizerView.isInitialized) return
+        val service = AudioPlayerService.currentService
+        val audioPane = service?.currentTrack?.mediaKind == PlaylistMediaKind.AUDIO && !isShowingAnsiOverlay
+        val show = audioPane && !fxRenderAvailable
+        visualPaneVisualizerView.visibility = if (show) View.VISIBLE else View.GONE
+        val playing = if (CastManager.isCasting) CastManager.isRemotePlaying else service?.isPlaying == true
+        visualPaneVisualizerView.isPlaying = show && playing
+        if (show) visualPaneVisualizerView.updateData(visualizerBands)
+    }
+
+    private fun hideVisualPaneFallback() {
+        if (!::visualPaneVisualizerView.isInitialized) return
+        visualPaneVisualizerView.visibility = View.GONE
+        visualPaneVisualizerView.isPlaying = false
+    }
+
     private fun updateTrackView(track: AudioTrack?) {
         if (track == null) {
             if (::fxArtworkView.isInitialized) fxArtworkView.setSourceBitmap(null)
-            if (::visualPaneVisualizerView.isInitialized) visualPaneVisualizerView.visibility = View.GONE
+            if (::visualPaneVisualizerView.isInitialized) hideVisualPaneFallback()
             fxRenderAvailable = false
             if (::visualFxEditorOverlayButton.isInitialized) visualFxEditorOverlayButton.visibility = View.GONE
             if (::albumArtView.isInitialized) albumArtView.alpha = 1f
@@ -3881,7 +4011,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
         when (track.mediaKind) {
             PlaylistMediaKind.ANSI -> {
                 fxArtworkView.setSourceBitmap(null)
-                visualPaneVisualizerView.visibility = View.GONE
+                hideVisualPaneFallback()
                 visualFxEditorOverlayButton.visibility = View.GONE
                 albumArtView.alpha = 1f
                 visualPaneMetadata.alpha = 1f
@@ -3902,7 +4032,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
             }
             PlaylistMediaKind.IMAGE -> {
                 if (changedVisual) fxArtworkView.setSourceBitmap(null)
-                visualPaneVisualizerView.visibility = View.GONE
+                hideVisualPaneFallback()
                 visualFxEditorOverlayButton.visibility = View.GONE
                 visualPaneMetadata.alpha = 1f
                 isShowingAnsiOverlay = false
@@ -3921,7 +4051,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
             }
             PlaylistMediaKind.VIDEO -> {
                 fxArtworkView.setSourceBitmap(null)
-                visualPaneVisualizerView.visibility = View.GONE
+                hideVisualPaneFallback()
                 visualFxEditorOverlayButton.visibility = View.GONE
                 visualPaneMetadata.alpha = 1f
                 isShowingAnsiOverlay = false
@@ -3953,7 +4083,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
                 visualPaneDetailsText.text = remainingRows.joinToString("\n") { it.ifBlank { "\u00A0" } }
                 if (ansiOverlay != null) {
                     fxArtworkView.setSourceBitmap(null)
-                    visualPaneVisualizerView.visibility = View.GONE
+                    hideVisualPaneFallback()
                     visualFxEditorOverlayButton.visibility = View.GONE
                     albumArtView.alpha = 1f
                     visualPaneMetadata.alpha = 1f
@@ -3966,8 +4096,8 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
                     ansiTerminalView.setPlaying(ansiOverlay.elapsedMs() < ansiOverlay.durationMs)
                     visualPaneDetailsText.text = "ANSI output · ${metadataDetails.ifBlank { track.title }}"
                 } else {
-                    visualPaneVisualizerView.visibility = if (fxRenderAvailable) View.GONE else View.VISIBLE
                     isShowingAnsiOverlay = false
+                    refreshVisualPaneFallback()
                     ansiTerminalView.setPlaying(false)
                     if (!wasShowingAnsi) {
                         ansiTerminalView.visibility = View.GONE
@@ -4700,7 +4830,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
             appendLine(track.title)
             track.artist?.takeIf { it.isNotBlank() }?.let { appendLine("Artist: $it") }
             track.album?.takeIf { it.isNotBlank() }?.let { appendLine("Album: $it") }
-            appendLine("File: ${track.fileName}")
+            appendLine("File: ${track.filePath?.takeIf(String::isNotBlank) ?: track.fileName}")
             track.sourceMimeType?.let { appendLine("Type: $it") }
             appendLine("Duration: ${if (track.durationMs > 0) formatTime(track.durationMs) else "Unknown"}")
             track.bitrateKbps?.let { appendLine("Bitrate: $it kb/s") }
@@ -4816,7 +4946,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
             updatePlayPauseButton(effectivePlaying)
             loadingIndicator.visibility = if (isLoading) View.VISIBLE else View.GONE
             visualizerView.isPlaying = effectivePlaying
-            visualPaneVisualizerView.isPlaying = effectivePlaying
+            visualPaneVisualizerView.isPlaying = visualPaneVisualizerView.visibility == View.VISIBLE && effectivePlaying
             if (::winampMainWindowView.isInitialized) {
                 winampMainWindowView.isPlaying = effectivePlaying
                 winampMainWindowView.isPaused = (!effectivePlaying && ((AudioPlayerService.currentService?.currentPosition ?: 0) > 0 || CastManager.isCasting))
@@ -4981,7 +5111,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
                     winampMainWindowView.isPlaying = isPlaying
                 }
                 visualizerView.isPlaying = isPlaying
-                visualPaneVisualizerView.isPlaying = isPlaying
+                visualPaneVisualizerView.isPlaying = visualPaneVisualizerView.visibility == View.VISIBLE && isPlaying
             }
         }
     }

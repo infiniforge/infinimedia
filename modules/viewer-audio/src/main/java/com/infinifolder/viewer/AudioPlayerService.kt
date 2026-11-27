@@ -86,7 +86,9 @@ data class AudioTrack(
     val directoryCoverReference: String? = null,
     /** Optional tags when a host or future metadata reader can supply them. */
     val recordCompany: String? = null,
-    val producer: String? = null
+    val producer: String? = null,
+    /** Current path relative to the directory handed to InfiniMedia, when available. */
+    val filePath: String? = null,
 ) {
     /** Android URI currently used to read this item. */
     val contentUri: Uri? get() = uri.takeIf {
@@ -2181,6 +2183,7 @@ class AudioPlayerService : Service() {
         updateMediaSession(track, isPlaying)
         val copy = synchronized(listeners) { ArrayList(listeners) }
         copy.forEach { runCatching { it.onTrackChanged(track, idx, total) } }
+        WinampMiniPlayerWidgetProvider.requestRefresh(this)
     }
 
     private fun notifyAudioSession(sessionId: Int) {
@@ -2192,6 +2195,7 @@ class AudioPlayerService : Service() {
         updateMediaSession(currentTrack, isPlaying)
         val copy = synchronized(listeners) { ArrayList(listeners) }
         copy.forEach { runCatching { it.onPlaybackStateChanged(isPlaying, isLoading) } }
+        WinampMiniPlayerWidgetProvider.requestRefresh(this)
     }
 
     private fun updateMediaSession(track: AudioTrack?, isPlaying: Boolean) {

@@ -101,7 +101,15 @@ Device playback and visual transition behavior still need on-device acceptance.
 
 ## Queueing media
 
-The queue add flow selects audio, video and images together; InfiniMedia requests all three supported media categories without a category-checkbox prompt. From InfiniFolder, **Queue all media in InfiniMedia** recursively gathers supported audio, video and image items from a directory or supported container. A readable `cover.*` image is queued first for each source directory so it appears as that directory’s first playlist item. Runtime format capabilities and MIME/extension filters determine which items are offered.
+The queue add flow selects audio, video and images together; InfiniMedia requests all three supported media categories without a category-checkbox prompt. From InfiniFolder, **Queue all media in InfiniMedia** sends the directory identity and access grant to Media. Media recursively lists the directory through libinfiniselect, filters supported audio, video and image items, and queues them alphabetically. Runtime format capabilities and MIME/extension filters determine which items are offered.
+
+## Home-screen mini player
+
+InfiniMedia provides a one-row, horizontally resizable Winamp windowshade widget.
+It shows the current track in the skin's 275×14 windowshade bar, scales to the available
+width while preserving that ratio, and stays top-aligned in the widget box. Tap
+the title area to open the player; the small windowshade buttons control playback.
+The track title scrolls through the title lane when it is longer than the lane.
 
 ## ANSI art and ANSI Music
 

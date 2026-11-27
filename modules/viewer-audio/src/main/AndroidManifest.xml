@@ -15,5 +15,17 @@
             android:name="com.infinifolder.viewer.AudioPlayerService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+        <receiver
+            android:name="com.infinifolder.viewer.WinampMiniPlayerWidgetProvider"
+            android:label="@string/winamp_mini_player_widget_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.infinifolder.viewer.action.REFRESH_MINI_PLAYER_WIDGET" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/winamp_mini_player_widget_info" />
+        </receiver>
     </application>
 </manifest>

@@ -1,3 +1,3 @@
-# Planned work
+# Completed ownership changes
 
-- [ ] Move playlist generation out of InfiniSelect into InfiniMedia. InfiniMedia should enumerate sources through InfiniSelect's directory-listing API and own playlist assembly, ordering and persistence. Keep authoritative resource identities and URI-grant behavior intact. This migration is deferred; current playlist behavior remains unchanged.
+- [x] InfiniMedia owns playlist generation, ordering and persistence. Folder sends a directory identity and grant; Media recursively enumerates it through libinfiniselect, filters supported audio/video/image items, and sorts the queue alphabetically. Authoritative identities remain separate from temporary content URIs.

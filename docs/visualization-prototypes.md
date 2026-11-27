@@ -42,10 +42,12 @@ editor lists available filters and every active chain item as a dark dropdown. E
 stage also has ✏️ edit, ⬆️ up, ⬇️ down, and 🗑️ delete buttons. Edit opens controls
 generated from the effect's parameter descriptors; Add effect appears below the chain. The chain may
 contain zero through twelve items, and its selection persists when the playlist
-changes. Fire and lightning are generator stages explicitly alpha-composited
-over the accumulated image at their chain position. Lightning spectrum is
-included last by default and can be replaced or deleted. An empty image
-chain is a source bypass and has no hidden lightning stage.
+changes. Every image filter, including kaleidoscope, consumes the immediately
+preceding chain stage's output; only the first stage receives the original source
+image. Fire and lightning are generator stages explicitly alpha-composited over
+the accumulated image at their chain position. Lightning spectrum is included
+last by default and can be replaced or deleted. An empty chain is a source
+bypass and has no hidden lightning stage.
 
 The default chain is rotozoom, CRT, water refraction, and lightning spectrum.
 Available options include pass-through, CRT, LCD, rotozoom, kaleidoscope, water
@@ -61,8 +63,10 @@ samples the bitmap on a deterministic 32×32 grid, quantizes RGB to six bits
 total (two bits per channel), merges duplicate bins, averages colors within
 each bin, and orders the palette by sample count. Present zero-valued bands have
 zero height; the low autonomous baseline is used only when band data is missing.
-The segmented prototype is full-width and keeps a quiet baseline while acting
-as the first-frame or error fallback.
+The segmented prototype is full-width and keeps a quiet baseline only while
+there is no successful GL frame or after a render error. When GL rendering is
+available, the fallback view is hidden and its animation/data updates stop; it
+returns only if GL becomes unavailable.
 
 Tapping the visual pane reveals EDIT FX beside the full-screen button for the
 same four-second overlay window.
@@ -347,3 +351,13 @@ user changes its order. The graph receives the updated stage parameters.
 errors, 0 skipped). `ANDROID_HOME="$HOME/android-sdk" ./build.sh --max-workers=1
 --console=plain` assembled `InfiniMedia-debug.apk`. No device was connected; the
 editor layout and its interactive behavior remain not verified on device.
+
+
+### GL fallback and sequential input behavior — 2026-11-21
+
+The app no longer updates the legacy spectrum fallback view while a GL frame is
+rendering successfully. It remains a visible startup/recovery fallback when the
+GL path is unavailable. The image graph is sequential: each transformer reads
+the output of its prior chain item, so Kaleidoscope transforms the preceding
+effect's result rather than independently sampling the original artwork.
+`FxPipelineTest` covers that connection.

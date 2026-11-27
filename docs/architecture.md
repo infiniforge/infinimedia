@@ -9,8 +9,9 @@ or Infiniscribe as Gradle projects and does not import their application source.
 - The application root owns launch routing, app configuration, exported intent
   handling, and generated Android file-opening filters.
 - `modules/viewer-audio` owns audio playback UI and service behavior, queues,
-  playlists, Cast integration, and the bridge from shared audio decoding to
-  Android output.
+  playlist generation and persistence, Cast integration, and the bridge from
+  shared audio decoding to Android output. Directory requests use libinfiniselect
+  listings to recursively find supported audio, video and image sources.
 - `modules/viewer-video` owns video playback controls, lifecycle, and media
   source leases while using the public `libinfinivideo` API for playback.
 - `modules/viewer-audio` keeps the PCM-driven spectrum, oscilloscope, and VU

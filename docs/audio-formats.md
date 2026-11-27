@@ -7,10 +7,11 @@ Updated 2026-11-02; current queue and metadata follow-up added 2026-11-16. This 
 ## Mixed-media queueing and remote metadata (2026-11-16)
 
 InfiniMedia's Add media selection requests audio, video and images together. From a
-Folder directory or supported container, **Queue all media in InfiniMedia** recursively
-adds supported media matched by runtime capabilities and MIME/extension filters. A
-readable `cover.*` image is queued first for its directory. Images and video appear
-as queue items; this does not expand the audio decoder's supported formats.
+Folder directory or supported container, **Queue all media in InfiniMedia** sends the
+directory identity to Media. The app uses libinfiniselect's paged listing API to
+recursively find readable audio, video and image items, then sorts them alphabetically.
+Images and video appear as queue items; this does not expand the audio decoder's
+supported formats.
 
 Playback and background tag reads allow 16 MiB and 512 positional reads per probe,
 with a cooperative time budget of 30 seconds for positional sources and 10 seconds

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="winamp_mini_player_widget_label">Infinimedia mini player</string>
+    <string name="winamp_mini_player_widget_description">Winamp windowshade player bar and current track.</string>
+    <string name="winamp_widget_play_pause">Play or pause</string>
+    <string name="winamp_widget_previous">Previous track</string>
+    <string name="winamp_widget_stop">Stop playback</string>
+    <string name="winamp_widget_next">Next track</string>
+    <string name="winamp_widget_open_player">Open Infinimedia</string>
+</resources>

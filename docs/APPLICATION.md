@@ -11,7 +11,7 @@ InfiniMedia is InfiniForge's independent Android audio/video player, playlist ma
 - Play supported audio including documented MIDI and tracker formats, with optional user-imported soundfonts where supported.
 - Play supported video and present supported image/animation items in the visual-media surface.
 - Use the retained PCM-driven spectrum, oscilloscope, and VU prototypes plus a libinfinifx graph over audio artwork and static images, custom player themes/Winamp-style presentation, and available cast or external playback routes.
-- Queue supported audio, video, and image resources recursively from a Folder directory/container when its provider is installed.
+- Receive a Folder directory handoff, recursively list supported audio, video, and image resources through libinfiniselect, and assemble an alphabetized queue in Media.
 
 ## Implementation status
 
@@ -44,7 +44,7 @@ Infinifolder may supply remote and container access through its public provider 
 
 ## Planned and potential work
 
-The product direction includes saved effect recipes and persistent per-preset settings, richer palette and animation workflows, richer album-oriented organization beyond current directory/cover-first queueing, saved non-destructive effect settings, playback ranges, and deterministic video export. Silence removal and any additional casting/output behavior need explicit design and implementation before being described as supported. The app does not currently contain the former heat, momentum, fire, smoke, wind, or lightning simulation.
+The product direction includes saved effect recipes and persistent per-preset settings, richer palette and animation workflows, richer album-oriented organization beyond current alphabetical directory queues and file-selection grouping, saved non-destructive effect settings, playback ranges, and deterministic video export. Silence removal and any additional casting/output behavior need explicit design and implementation before being described as supported. The app does not currently contain the former heat, momentum, fire, smoke, wind, or lightning simulation.
 
 ## Limitations and outstanding work
 

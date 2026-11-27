@@ -7,7 +7,6 @@ import android.provider.OpenableColumns
 import android.widget.Toast
 import io.github.gretchycat.infiniselect.InfiniSelect
 import io.github.gretchycat.infiniselect.FileSelectionContract
-import io.github.gretchycat.infiniselect.SelectionItem
 import com.infinifolder.viewer.ViewerActivity
 
 class InfiniMediaActivity : ViewerActivity() {
@@ -16,17 +15,20 @@ class InfiniMediaActivity : ViewerActivity() {
         openMediaPlayer(intent)
         finish()
     }
-    /** InfiniMedia's application entry point forwards Android shares straight to its player. */
+    /** Forward selected URIs and directory identities to Media's app-owned playlist builder. */
     private fun openMediaPlayer(source: Intent?) {
         val action = source?.action
         val uris = linkedSetOf<Uri>()
         source?.data?.let(uris::add)
         if (action == Intent.ACTION_SEND || action == Intent.ACTION_SEND_MULTIPLE) {
             source?.getParcelableArrayListExtraCompat(Intent.EXTRA_STREAM)?.forEach(uris::add)
-            source?.clipData?.let { clip -> for (index in 0 until clip.itemCount) clip.getItemAt(index).uri?.let(uris::add) }
+            source?.clipData?.let { clip ->
+                for (index in 0 until clip.itemCount) clip.getItemAt(index).uri?.let(uris::add)
+            }
             source?.getParcelableExtraCompat(Intent.EXTRA_STREAM)?.let(uris::add)
         }
         val sourceReferences = source?.getStringArrayListExtra(FileSelectionContract.EXTRA_RESULT_AUTHORITATIVE_URIS)
+            ?: source?.getStringArrayListExtra(FileSelectionContract.EXTRA_RESULT_SOURCE_REFERENCES)
         val singleReference = source?.getStringExtra(FileSelectionContract.EXTRA_RESULT_AUTHORITATIVE_URI)
             ?: source?.getStringArrayListExtra(FileSelectionContract.EXTRA_RESULT_SOURCE_REFERENCES)?.firstOrNull()
         fun authoritativeReference(uri: Uri, index: Int): String? =
@@ -39,65 +41,83 @@ class InfiniMediaActivity : ViewerActivity() {
                 ?.takeIf(String::isNotBlank)
                 ?: runCatching { contentResolver.getType(uri) }.getOrNull()
                 ?: "application/octet-stream"
-        val playerIntent = if (uris.size > 1) {
-            val items = uris.map { uri ->
-                val index = uris.indexOf(uri)
-                val queried = runCatching {
-                    contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)
-                        ?.use { cursor ->
-                            if (!cursor.moveToFirst()) null to null else {
-                                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                                val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
-                                (nameIndex.takeIf { it >= 0 }?.let(cursor::getString)) to
-                                    (sizeIndex.takeIf { it >= 0 }?.let(cursor::getLong)?.takeIf { it >= 0L })
-                            }
-                        } ?: (null to null)
-                }.getOrDefault(null to null)
-                SelectionItem(
-                    uri = uri,
-                    name = source?.getStringArrayListExtra(FileSelectionContract.EXTRA_RESULT_NAMES)
-                        ?.getOrNull(index)?.takeIf(String::isNotBlank)
-                        ?: queried.first ?: uri.lastPathSegment.orEmpty(),
-                    mimeType = mimeType(uri, index),
-                    sizeBytes = queried.second,
-                    sourceReference = authoritativeReference(uri, index),
-                )
-            }
-            val playlist = runCatching { InfiniSelect.createJspfPlaylist(this, items, "Shared media.jspf") }
-                .getOrElse { error ->
-                    Toast.makeText(this, "Could not prepare the selected media: ${error.message ?: "missing storage location"}", Toast.LENGTH_LONG).show()
-                    return
+
+        val only = uris.singleOrNull()
+        val mime = only?.let { source?.type?.takeIf(String::isNotBlank) ?: mimeType(it, 0) }
+        val directoryUri = source?.getStringExtra(FileSelectionContract.EXTRA_RESULT_DIRECTORY)
+            ?.takeIf(String::isNotBlank)?.let(Uri::parse)
+            ?: only?.takeIf { mime == android.provider.DocumentsContract.Document.MIME_TYPE_DIR }
+        val isDirectory = directoryUri != null
+        val playerIntent = when {
+            directoryUri != null -> Intent(this, com.infinifolder.viewer.AudioPlayerActivity::class.java).apply {
+                setAction(Intent.ACTION_VIEW)
+                setDataAndType(directoryUri, android.provider.DocumentsContract.Document.MIME_TYPE_DIR)
+                val directoryName = source?.getStringExtra("displayName")
+                    ?: source?.getStringExtra("extra_name") ?: displayName(directoryUri)
+                putExtra("displayName", directoryName)
+                putExtra("mimeType", android.provider.DocumentsContract.Document.MIME_TYPE_DIR)
+                val directoryReference = source?.getStringExtra(FileSelectionContract.EXTRA_RESULT_DIRECTORY_REFERENCE)
+                    ?: source?.getStringExtra(FileSelectionContract.EXTRA_RESULT_AUTHORITATIVE_URI)
+                    ?: authoritativeReference(directoryUri, uris.indexOf(directoryUri).coerceAtLeast(0))
+                    ?: directoryUri.toString()
+                putExtra(FileSelectionContract.EXTRA_RESULT_DIRECTORY_REFERENCE, directoryReference)
+                putExtra(FileSelectionContract.EXTRA_RESULT_AUTHORITATIVE_URI, directoryReference)
+                putExtra(FileSelectionContract.EXTRA_RESULT_DIRECTORY, directoryUri.toString())
+                val directoryPathName = source?.getStringExtra(FileSelectionContract.EXTRA_RESULT_DIRECTORY_NAME)
+                    ?: source?.getStringExtra("displayName")?.removePrefix("Media from ")
+                directoryPathName?.takeIf(String::isNotBlank)?.let {
+                    putExtra(FileSelectionContract.EXTRA_RESULT_DIRECTORY_NAME, it)
                 }
-            Intent(this, com.infinifolder.viewer.AudioPlayerActivity::class.java).apply {
-                this.action = Intent.ACTION_VIEW
-                setDataAndType(playlist, "application/jspf+json")
-                putExtra("displayName", "Shared media.jspf")
-                putExtra("mimeType", "application/jspf+json")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-        } else {
-            val uri = uris.firstOrNull()
-            if (uri == null) Intent(this, com.infinifolder.viewer.AudioPlayerActivity::class.java)
+            only == null -> Intent(this, com.infinifolder.viewer.AudioPlayerActivity::class.java)
                 .setAction(Intent.ACTION_MAIN)
-            else Intent(this, com.infinifolder.viewer.AudioPlayerActivity::class.java).apply {
-                val authoritative = authoritativeReference(uri, 0)
-                val mime = source?.type?.takeIf(String::isNotBlank) ?: mimeType(uri, 0)
-                this.action = Intent.ACTION_VIEW
-                setDataAndType(uri, mime)
+            uris.size > 1 -> Intent(this, com.infinifolder.viewer.AudioPlayerActivity::class.java).apply {
+                setAction(Intent.ACTION_SEND_MULTIPLE)
+                setType(source?.type?.takeIf(String::isNotBlank) ?: "*/*")
+                putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+                sourceReferences?.let {
+                    putStringArrayListExtra(FileSelectionContract.EXTRA_RESULT_AUTHORITATIVE_URIS, it)
+                    putStringArrayListExtra(FileSelectionContract.EXTRA_RESULT_SOURCE_REFERENCES, it)
+                }
+                source?.getStringArrayListExtra(FileSelectionContract.EXTRA_RESULT_NAMES)?.let {
+                    putStringArrayListExtra(FileSelectionContract.EXTRA_RESULT_NAMES, it)
+                }
+                source?.getStringArrayListExtra(FileSelectionContract.EXTRA_RESULT_MIMES)?.let {
+                    putStringArrayListExtra(FileSelectionContract.EXTRA_RESULT_MIMES, it)
+                }
+            }
+            else -> Intent(this, com.infinifolder.viewer.AudioPlayerActivity::class.java).apply {
+                setAction(Intent.ACTION_VIEW)
+                setDataAndType(only, mime ?: "application/octet-stream")
                 putExtra("displayName", source?.getStringExtra("displayName")
-                    ?: source?.getStringExtra("extra_name") ?: displayName(uri))
+                    ?: source?.getStringExtra("extra_name") ?: displayName(only))
                 putExtra("mimeType", mime)
-                authoritative?.let { putExtra(FileSelectionContract.EXTRA_RESULT_AUTHORITATIVE_URI, it) }
+                authoritativeReference(only, 0)?.let {
+                    putExtra(FileSelectionContract.EXTRA_RESULT_AUTHORITATIVE_URI, it)
+                }
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
         }
-        source?.clipData?.let { playerIntent.clipData = it }
+        if (directoryUri != null) {
+            val directoryName = source?.getStringExtra("displayName") ?: displayName(directoryUri)
+            playerIntent.clipData = android.content.ClipData.newRawUri(directoryName, directoryUri).apply {
+                source?.clipData?.let { existing ->
+                    for (index in 0 until existing.itemCount) {
+                        val item = existing.getItemAt(index)
+                        if (item.uri != directoryUri) addItem(item)
+                    }
+                }
+            }
+        } else {
+            source?.clipData?.let { playerIntent.clipData = it }
+        }
         playerIntent.addFlags(source?.flags?.and(
             Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
         ) ?: 0)
-        val only = uris.singleOrNull()
-        if (only != null && com.infinifolder.viewer.MediaTypeDetector.detect(displayName(only),
-                source?.type?.takeIf(String::isNotBlank) ?: mimeType(only, 0)) == com.infinifolder.viewer.MediaType.VIDEO) {
+        if (only != null && !isDirectory &&
+            com.infinifolder.viewer.MediaTypeDetector.detect(displayName(only), mime.orEmpty()) ==
+                com.infinifolder.viewer.MediaType.VIDEO) {
             playerIntent.setClass(this, com.infinifolder.viewer.VideoPlayerActivity::class.java)
         }
         runCatching { startActivity(playerIntent) }.onFailure { error ->

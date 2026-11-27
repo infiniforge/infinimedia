@@ -37,7 +37,7 @@ android {
 
 dependencies {
     implementation("io.github.gretchycat.libinfiniui:ui-android:0.1.0")
-    implementation("io.github.gretchycat.libinfiniselect:select-android:0.1.0")
+    implementation("io.github.gretchycat.libinfiniselect:select-android:0.2.4")
     implementation(project(":viewer-audio"))
     implementation(project(":viewer-video"))
 }
