@@ -51,6 +51,7 @@ import com.infinifolder.theme.AppThemeId
 import com.infinifolder.theme.ThemeChangeListener
 import com.infinifolder.theme.ThemeColors
 import com.infinifolder.theme.ThemeManager
+import com.infinimedia.spotify.SpotifyWorkspaceActivity
 import io.github.gretchycat.infinistream.ContentType
 import io.github.gretchycat.infinistream.Operations
 import io.github.gretchycat.infinistream.RuntimeCapabilities
@@ -139,16 +140,9 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
     private var preFullscreenVisibility: Map<View, Int> = emptyMap()
     private var preFullscreenSystemUiVisibility: Int? = null
     private lateinit var topInsetArea: View
-    private lateinit var topBar: LinearLayout
-    private lateinit var headerText: TextView
-    private lateinit var backBtn: TextView
-    private lateinit var themeBtn: TextView
-    private lateinit var soundFontBtn: TextView
-    private lateinit var playlistBtn: TextView
-    private lateinit var addToPlaylistBtn: TextView
-    private lateinit var castBtn: TextView
-    private lateinit var openExtBtn: TextView
-    private lateinit var visualPaneBtn: TextView
+    private var titleMenuHitTarget: View? = null
+    private var titleMenuHitHost: FrameLayout? = null
+    private var menuPopupAnchor: View? = null
 
     private lateinit var consoleCard: LinearLayout
     private lateinit var timerLedView: TextView
@@ -331,6 +325,108 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
         val padT = if (isWinamp || isWmp) 0 else dp(6)
         val padB = (if (isWinamp || isWmp) 0 else dp(16)) + insetBottom
         rootLayout.setPadding(padH, padT, padRight, padB)
+        updateTitleMenuHitTarget()
+        updateMenuPopupAnchor()
+    }
+
+    /** Adds a standalone menu button in the former title-bar area when no skin title image is available. */
+    private fun installTitleMenuHitTarget() {
+        val host = findViewById<FrameLayout>(android.R.id.content) ?: return
+        titleMenuHitHost = host
+        val target = FrameLayout(this).apply {
+            contentDescription = "Open menu"
+            isClickable = true
+            isFocusable = true
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+            setBackgroundColor(Color.TRANSPARENT)
+            setOnClickListener { showPlayerMenu() }
+            val menuButton = TextView(this@AudioPlayerActivity).apply {
+                text = "☰"
+                textSize = 22f
+                gravity = Gravity.CENTER
+                setTextColor(ThemeManager.getAudioPlayerTheme(this@AudioPlayerActivity).textPrimary)
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                val selectable = android.util.TypedValue()
+                if (theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, selectable, true)) {
+                    setBackgroundResource(selectable.resourceId)
+                }
+            }
+            addView(menuButton, FrameLayout.LayoutParams(dp(48), dp(48), Gravity.START or Gravity.CENTER_VERTICAL).apply {
+                marginStart = dp(4)
+            })
+        }
+        titleMenuHitTarget = target
+        host.addView(target, FrameLayout.LayoutParams(-1, dp(54), Gravity.TOP or Gravity.START))
+
+        val popupAnchor = View(this).apply {
+            alpha = 0f
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            isClickable = false
+            isFocusable = false
+        }
+        menuPopupAnchor = popupAnchor
+        host.addView(popupAnchor, FrameLayout.LayoutParams(dp(1), dp(1), Gravity.TOP or Gravity.START))
+
+        updateTitleMenuHitTarget()
+        updateMenuPopupAnchor()
+        rootLayout.post {
+            updateTitleMenuHitTarget()
+            updateMenuPopupAnchor()
+        }
+    }
+
+    private fun updateMenuPopupAnchor() {
+        val anchor = menuPopupAnchor ?: return
+        val host = titleMenuHitHost ?: return
+        if (!::rootLayout.isInitialized) return
+        val rootPosition = IntArray(2)
+        val hostPosition = IntArray(2)
+        rootLayout.getLocationOnScreen(rootPosition)
+        host.getLocationOnScreen(hostPosition)
+        val isLandscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val statusBarBottom = maxOf(
+            hostPosition[1],
+            rootPosition[1] + systemInsetTop,
+            if (isLandscape) 0 else getStatusBarHeight()
+        )
+        val safeLeft = maxOf(hostPosition[0], rootPosition[0] + systemInsetLeft)
+        val params = (anchor.layoutParams as? FrameLayout.LayoutParams)
+            ?: FrameLayout.LayoutParams(dp(1), dp(1), Gravity.TOP or Gravity.START)
+        params.width = dp(1)
+        params.height = dp(1)
+        params.gravity = Gravity.TOP or Gravity.START
+        params.leftMargin = (safeLeft - hostPosition[0]).coerceAtLeast(0)
+        params.topMargin = (statusBarBottom - hostPosition[1]).coerceAtLeast(0)
+        anchor.layoutParams = params
+    }
+
+    private fun updateTitleMenuHitTarget() {
+        val target = titleMenuHitTarget ?: return
+        val host = titleMenuHitHost ?: return
+        if (!::rootLayout.isInitialized) return
+        val themeId = ThemeManager.getAudioPlayerTheme(this).id
+        val usesSkinTitleBar = themeId == AppThemeId.WINAMP_CLASSIC || themeId == AppThemeId.CUSTOM_WSZ
+        if (isLandscapeVideoFullscreen || usesSkinTitleBar) {
+            target.visibility = View.GONE
+            return
+        }
+
+        val rootPosition = IntArray(2)
+        val hostPosition = IntArray(2)
+        rootLayout.getLocationOnScreen(rootPosition)
+        host.getLocationOnScreen(hostPosition)
+        val insetHeight = if (::topInsetArea.isInitialized && topInsetArea.visibility == View.VISIBLE) {
+            (topInsetArea.layoutParams?.height ?: topInsetArea.height).coerceAtLeast(0)
+        } else 0
+        val titleBarTop = rootPosition[1] - hostPosition[1] + rootLayout.paddingTop + insetHeight
+        val params = (target.layoutParams as? FrameLayout.LayoutParams)
+            ?: FrameLayout.LayoutParams(-1, dp(54), Gravity.TOP or Gravity.START)
+        params.width = -1
+        params.height = dp(54)
+        params.gravity = Gravity.TOP or Gravity.START
+        params.topMargin = titleBarTop.coerceAtLeast(0)
+        target.layoutParams = params
+        target.visibility = View.VISIBLE
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -1196,48 +1292,6 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
         }.start()
     }
 
-    private var touchDownX = 0f
-    private var touchDownY = 0f
-    private var touchDownTime = 0L
-
-    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-        if (isLandscapeVideoFullscreen) return super.dispatchTouchEvent(ev)
-        when (ev.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                touchDownX = ev.rawX
-                touchDownY = ev.rawY
-                touchDownTime = System.currentTimeMillis()
-            }
-            MotionEvent.ACTION_UP -> {
-                val dx = kotlin.math.abs(ev.rawX - touchDownX)
-                val dy = kotlin.math.abs(ev.rawY - touchDownY)
-                val duration = System.currentTimeMillis() - touchDownTime
-                val isTap = dx < dp(15) && dy < dp(15) && duration < 500
-
-                if (isTap && ThemeManager.getAudioPlayerTheme(this).id != AppThemeId.WMP_GLASS) {
-                    val rawX = ev.rawX.toInt()
-                    val rawY = ev.rawY.toInt()
-
-                    if (::topBar.isInitialized && topBar.visibility == View.VISIBLE) {
-                        val topBarRect = Rect()
-                        topBar.getGlobalVisibleRect(topBarRect)
-                        if (!topBarRect.contains(rawX, rawY)) {
-                            // Tapped anywhere else -> hide the Now playing bar!
-                            topBar.visibility = View.GONE
-                        }
-                    } else if (::topBar.isInitialized && topBar.visibility != View.VISIBLE) {
-                        // Tapped while hidden -> reveal if tapped on the top bar region
-                        val topBarThreshold = systemInsetTop + dp(54)
-                        if (rawY <= topBarThreshold) {
-                            topBar.visibility = View.VISIBLE
-                        }
-                    }
-                }
-            }
-        }
-        return super.dispatchTouchEvent(ev)
-    }
-
     private var isLandscapeVideoFullscreen = false
     private var previousRequestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
     private var previousWindowedConfigurationOrientation = android.content.res.Configuration.ORIENTATION_UNDEFINED
@@ -1281,6 +1335,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
         if (isLandscapeVideoFullscreen || !::artCard.isInitialized ||
             !canShowVisualFullscreen()) return
         isLandscapeVideoFullscreen = true
+        updateTitleMenuHitTarget()
         previousRequestedOrientation = requestedOrientation
         previousWindowedConfigurationOrientation = resources.configuration.orientation
         previousWindowedDisplayRotation = currentDisplayRotation()
@@ -1319,6 +1374,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
     private fun exitLandscapeVideoFullscreen() {
         if (!isLandscapeVideoFullscreen) return
         isLandscapeVideoFullscreen = false
+        updateTitleMenuHitTarget()
         fullscreenButtonHandler.removeCallbacks(hideFullscreenButton)
         if (::fullscreenVideoButton.isInitialized) fullscreenVideoButton.visibility = View.GONE
         if (::visualFxEditorOverlayButton.isInitialized) visualFxEditorOverlayButton.visibility = View.GONE
@@ -1462,150 +1518,12 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
             }
         }
 
-        // Top Bar (Now Playing header bar - hidden by default, tapped to reveal)
-        topBar = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(10), dp(6), dp(10), dp(6))
-            visibility = View.GONE
-        }
-
-        val selectableRes = android.util.TypedValue().let { tv ->
-            if (theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, tv, true)) tv.resourceId else 0
-        }
-
-        backBtn = TextView(this).apply {
-            text = "←"
-            textSize = 24f
-            typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-            includeFontPadding = false
-            setTextColor(Color.WHITE)
-            isClickable = true
-            isFocusable = true
-            if (selectableRes != 0) setBackgroundResource(selectableRes)
-            setOnClickListener { onBackPressed() }
-        }
-        topBar.addView(backBtn, LinearLayout.LayoutParams(dp(38), dp(38)))
-
-        headerText = TextView(this).apply {
-            text = "Now Playing"
-            textSize = 15f
-            typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-            includeFontPadding = false
-            isClickable = true
-            isFocusable = true
-            if (selectableRes != 0) setBackgroundResource(selectableRes)
-            setOnClickListener {
-                topBar.visibility = View.GONE
-            }
-        }
-        topBar.addView(headerText, LinearLayout.LayoutParams(0, -2, 1f))
-
-        // Theme Switcher Button
-        themeBtn = TextView(this).apply {
-            text = "🎨"
-            textSize = 17f
-            gravity = Gravity.CENTER
-            includeFontPadding = false
-            isClickable = true
-            isFocusable = true
-            if (selectableRes != 0) setBackgroundResource(selectableRes)
-            setOnClickListener { showThemeChooser() }
-        }
-        topBar.addView(themeBtn, LinearLayout.LayoutParams(dp(38), dp(38)))
-
-        soundFontBtn = TextView(this).apply {
-            text = "🎹"
-            textSize = 17f
-            gravity = Gravity.CENTER
-            includeFontPadding = false
-            isClickable = true
-            isFocusable = true
-            contentDescription = "MIDI soundfont"
-            if (selectableRes != 0) setBackgroundResource(selectableRes)
-            setOnClickListener { showMidiSoundFontSettings() }
-        }
-        topBar.addView(soundFontBtn, LinearLayout.LayoutParams(dp(38), dp(38)))
-
-        playlistBtn = TextView(this).apply {
-            text = "☰"
-            textSize = 19f
-            gravity = Gravity.CENTER
-            includeFontPadding = false
-            isClickable = true
-            isFocusable = true
-            if (selectableRes != 0) setBackgroundResource(selectableRes)
-            setOnClickListener { showPlaylistDialog() }
-        }
-        topBar.addView(playlistBtn, LinearLayout.LayoutParams(dp(38), dp(38)))
-
-        addToPlaylistBtn = TextView(this).apply {
-            text = "+"
-            textSize = 25f
-            gravity = Gravity.CENTER
-            includeFontPadding = false
-            isClickable = true
-            isFocusable = true
-            contentDescription = "Add to playlist"
-            if (selectableRes != 0) setBackgroundResource(selectableRes)
-            setOnClickListener { showAddTracksDialog() }
-        }
-        topBar.addView(addToPlaylistBtn, LinearLayout.LayoutParams(dp(38), dp(38)))
-
-        castBtn = TextView(this).apply {
-            text = "📡"
-            textSize = 17f
-            gravity = Gravity.CENTER
-            includeFontPadding = false
-            isClickable = true
-            isFocusable = true
-            if (selectableRes != 0) setBackgroundResource(selectableRes)
-            setOnClickListener { showCastDialog() }
-            setOnLongClickListener {
-                launchAudioOutput()
-                true
-            }
-        }
-        topBar.addView(castBtn, LinearLayout.LayoutParams(dp(38), dp(38)))
-
-        openExtBtn = TextView(this).apply {
-            text = "↗"
-            textSize = 17f
-            gravity = Gravity.CENTER
-            includeFontPadding = false
-            isClickable = true
-            isFocusable = true
-            if (selectableRes != 0) setBackgroundResource(selectableRes)
-            setOnClickListener { openExternally() }
-        }
-        topBar.addView(openExtBtn, LinearLayout.LayoutParams(dp(38), dp(38)))
-
-        visualPaneBtn = TextView(this).apply {
-            text = "VIS"
-            textSize = 11f
-            typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-            includeFontPadding = false
-            isClickable = true
-            isFocusable = true
-            contentDescription = "Open visual media pane"
-            if (selectableRes != 0) setBackgroundResource(selectableRes)
-            setOnClickListener {
-                winampVisualPaneOpen = !winampVisualPaneOpen
-                applyTheme(ThemeManager.getAudioPlayerTheme(this@AudioPlayerActivity))
-            }
-        }
-        topBar.addView(visualPaneBtn, LinearLayout.LayoutParams(dp(34), dp(38)))
-
-        DebugTools.attachToolbarButton(this, topBar)
+        // The former title/menu bar is removed; the skin title image or standalone button opens the menu.
         topInsetArea = View(this).apply {
             val isDark = ThemeManager.resolveIsDark(this@AudioPlayerActivity)
             setBackgroundColor(if (isDark) Color.BLACK else Color.WHITE)
         }
         rootLayout.addView(topInsetArea, LinearLayout.LayoutParams(-1, 0))
-        rootLayout.addView(topBar)
 
         // 1. Skin Player Container (Main Window docked at top, Playlist Window taking remaining height)
         skinContainer = LinearLayout(this).apply {
@@ -2122,6 +2040,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
         rootLayout.addView(wmpPlayerLayout)
         setContentView(rootLayout)
         configureSkinLayout()
+        installTitleMenuHitTarget()
 
         // One capture bridge serves the normal visual pane and optional classic skins.
         // It used to be created only by the Winamp setup path, which left the standard
@@ -2225,6 +2144,9 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
             override fun onClose() {
                 finish()
             }
+            override fun onMenuRequested() {
+                showPlayerMenu()
+            }
             override fun onVisualizerRequested() {
                 updateVisualizerCapture(AudioPlayerService.currentService?.audioSessionId ?: 0, explicitRequest = true)
             }
@@ -2238,6 +2160,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
         // 1. Authentic Playlist Window Titlebar (275x20 scaled to full width)
         dockedTitleBarView = WinampPlaylistTitleView(this).apply {
             layoutParams = LinearLayout.LayoutParams(-1, -2)
+            onMenuRequested = { showPlayerMenu() }
             onShadeToggle = {
                 val isHidden = dockedBodyRow.visibility == View.GONE
                 dockedBodyRow.visibility = if (isHidden) View.VISIBLE else View.GONE
@@ -2512,6 +2435,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
         skinSpareColumn = FrameLayout(this)
         detailsWindow = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         detailsTitle = WinampPlaylistTitleView(this).apply {
+            onMenuRequested = { showPlayerMenu() }
             onShadeToggle = {
                 val show = detailsBody.visibility != View.VISIBLE
                 detailsBody.visibility = if (show) View.VISIBLE else View.GONE
@@ -3273,32 +3197,8 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
         val density = resources.displayMetrics.density
         rootLayout.setBackgroundColor(theme.background)
 
-        val barBg = if (isSystemDark) Color.BLACK else Color.WHITE
-        val barStroke = theme.toolbarBorder
-        val barText = if (isSystemDark) Color.WHITE else Color.BLACK
-        val barSubText = theme.textSecondary
-
-        // Clean topBar background - pure black in dark mode, pure white in light mode
-        topBar.background = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            setColor(barBg)
-            setStroke((1 * density).toInt().coerceAtLeast(1), barStroke)
-        }
-        backBtn.setTextColor(barText)
-        headerText.setTextColor(barText)
-        themeBtn.setTextColor(barText)
-        soundFontBtn.setTextColor(barText)
-        playlistBtn.setTextColor(barText)
-        addToPlaylistBtn.setTextColor(barText)
-        castBtn.setTextColor(barText)
-        openExtBtn.setTextColor(barSubText)
-        visualPaneBtn.setTextColor(if (winampVisualPaneOpen) theme.accent else barText)
-        visualPaneBtn.contentDescription = if (winampVisualPaneOpen)
-            "Hide visual media window" else "Show visual media window"
-
         val isWinamp = (theme.id == AppThemeId.WINAMP_CLASSIC || theme.id == AppThemeId.CUSTOM_WSZ)
         val isWmp = theme.id == AppThemeId.WMP_GLASS
-        visualPaneBtn.visibility = if (isWinamp) View.VISIBLE else View.GONE
         dockedEqualizerView.visibility = if (isWinamp && winampEqualizerWindowOpen) View.VISIBLE else View.GONE
         dockedEqualizerView.invalidate()
         wmpPlayerLayout.setActive(isWmp)
@@ -3364,13 +3264,10 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
             volumeRow.visibility = View.VISIBLE
         }
 
-        headerText.setTextColor(theme.textPrimary)
-        headerText.text = "Now Playing"
 
         val font = if (theme.fontMonospace) Typeface.MONOSPACE else Typeface.DEFAULT
         val fontBold = if (theme.fontMonospace) Typeface.MONOSPACE else Typeface.DEFAULT_BOLD
 
-        headerText.typeface = fontBold
         trackTitleText.typeface = fontBold
         trackTitleText.setTextColor(theme.textPrimary)
 
@@ -3438,11 +3335,6 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
         prevBtn.setTextColor(theme.textPrimary)
         stopBtn.setTextColor(theme.textPrimary)
         nextBtn.setTextColor(theme.textPrimary)
-        themeBtn.setTextColor(theme.textPrimary)
-        soundFontBtn.setTextColor(theme.textPrimary)
-        playlistBtn.setTextColor(theme.textPrimary)
-        addToPlaylistBtn.setTextColor(theme.textPrimary)
-        openExtBtn.setTextColor(theme.textSecondary)
 
         if (isWinamp) {
             val prevBmp = ThemeManager.createCButtonDrawable(0)
@@ -3532,20 +3424,7 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
         speedBtn.setTextColor(theme.buttonText)
         speedBtn.background = ThemeManager.createButtonDrawable(theme, density)
 
-        if (isWmp) {
-            topBar.visibility = View.VISIBLE
-            topBar.background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(theme.toolbarBorder, theme.toolbarBackground)).apply {
-                setStroke(dp(1).coerceAtLeast(1), theme.cardStroke)
-            }
-            listOf(backBtn, headerText, themeBtn, soundFontBtn, playlistBtn, addToPlaylistBtn, castBtn, openExtBtn).forEach {
-                it.setTextColor(theme.textPrimary)
-            }
-            headerText.setOnClickListener { showPlaylistDialog() }
-            wmpPlayerLayout.applyTheme(theme)
-        } else {
-            headerText.setOnClickListener { topBar.visibility = View.GONE }
-        }
+        if (isWmp) wmpPlayerLayout.applyTheme(theme)
         updateControlsAppearance()
         if (isWmp) refreshWmpControls()
         updateSystemBarsForOrientation()
@@ -4462,6 +4341,68 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
     private var playlistDialog: AlertDialog? = null
     private var playlistDialogAdapter: android.widget.ArrayAdapter<String>? = null
 
+    private fun showPlayerMenu() {
+        val anchor = menuPopupAnchor ?: return
+        val popup = PopupMenu(this, anchor)
+        popup.gravity = Gravity.TOP or Gravity.START
+        if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+            val spotifyMenu = popup.menu.addSubMenu("♫ Spotify")
+            spotifyMenu.add("▶  Spotify workspace · connect").setOnMenuItemClickListener {
+                openSpotifyWorkspace()
+                true
+            }
+            spotifyMenu.add("⌕  Search Spotify catalog").setOnMenuItemClickListener {
+                openSpotifyWorkspace(SpotifyWorkspaceActivity.SECTION_SEARCH)
+                true
+            }
+            spotifyMenu.add("▤  Spotify playlists").setOnMenuItemClickListener {
+                openSpotifyWorkspace(SpotifyWorkspaceActivity.SECTION_PLAYLISTS)
+                true
+            }
+        }
+
+        val playerMenu = popup.menu.addSubMenu("⏵ Player")
+        playerMenu.add("▤  Playlist").setOnMenuItemClickListener { showPlaylistDialog(); true }
+        playerMenu.add("＋  Add media to playlist").setOnMenuItemClickListener { showAddTracksDialog(); true }
+        playerMenu.add("◉  Cast").setOnMenuItemClickListener { showCastDialog(); true }
+        playerMenu.add("⇄  Audio output routing").setOnMenuItemClickListener { launchAudioOutput(); true }
+        playerMenu.add("↗  Open with another app").setOnMenuItemClickListener { openExternally(); true }
+        val themeId = ThemeManager.getAudioPlayerTheme(this).id
+        val visualPaneItem = playerMenu.add(if (winampVisualPaneOpen) "▣  Hide visual media pane" else "▣  Show visual media pane")
+        visualPaneItem.isVisible = themeId == AppThemeId.WINAMP_CLASSIC || themeId == AppThemeId.CUSTOM_WSZ
+        visualPaneItem.setOnMenuItemClickListener {
+            winampVisualPaneOpen = !winampVisualPaneOpen
+            applyTheme(ThemeManager.getAudioPlayerTheme(this))
+            true
+        }
+
+        val settingsMenu = popup.menu.addSubMenu("⚙ Settings")
+        settingsMenu.add("◈  Theme").setOnMenuItemClickListener { showThemeChooser(); true }
+        settingsMenu.add("♫  MIDI soundfont").setOnMenuItemClickListener { showMidiSoundFontSettings(); true }
+        settingsMenu.add("≋  Equalizer").setOnMenuItemClickListener { showEqualizerDialog(); true }
+        settingsMenu.add("⏩  Playback speed").setOnMenuItemClickListener { showSpeedPicker(); true }
+
+        if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+            val debugMenu = popup.menu.addSubMenu("⚙ Debug")
+            debugMenu.add("🐞  Offload debug information").setOnMenuItemClickListener {
+                DebugTools.offload(this)
+                true
+            }
+            debugMenu.add("⚙  Debug dump settings").setOnMenuItemClickListener {
+                startActivity(Intent(this, DiagnosticsActivity::class.java))
+                true
+            }
+        }
+        popup.show()
+    }
+
+    private fun openSpotifyWorkspace(section: String? = null) {
+        val intent = Intent(this, SpotifyWorkspaceActivity::class.java)
+        if (section != null) intent.putExtra(SpotifyWorkspaceActivity.EXTRA_OPEN_SECTION, section)
+        runCatching { startActivity(intent) }
+            .onFailure { Toast.makeText(this, "Could not open Spotify workspace", Toast.LENGTH_SHORT).show() }
+    }
+
     private fun showPlaylistDialog() {
         val service = AudioPlayerService.currentService ?: return
         if (selectedPlaylistIndex !in service.playlist.indices) selectedPlaylistIndex = service.currentIndex
@@ -5054,11 +4995,6 @@ class AudioPlayerActivity : ViewerActivity(), AudioPlayerListener, ThemeChangeLi
     private fun updateCastButtonState() {
         val casting = CastManager.isCasting
         val connected = CastManager.hasConnectedSession
-        if (::castBtn.isInitialized) castBtn.text = when {
-            casting -> "📻"
-            connected -> "📡✓"
-            else -> "📡"
-        }
         dockedCastBtn?.let {
             it.text = when {
                 casting -> "📻 ${CastManager.deviceName?.take(10) ?: "Casting"}"

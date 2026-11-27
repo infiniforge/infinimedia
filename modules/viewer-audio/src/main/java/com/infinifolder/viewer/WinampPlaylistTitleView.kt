@@ -6,7 +6,9 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Rect
 import android.util.AttributeSet
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import com.infinifolder.theme.ThemeManager
 
 /**
@@ -26,6 +28,9 @@ class WinampPlaylistTitleView @JvmOverloads constructor(
     }
 
     var onShadeToggle: (() -> Unit)? = null
+    var onMenuRequested: (() -> Unit)? = null
+    private var downX = 0f
+    private var actionForClick: (() -> Unit)? = null
 
     private var pixelScaledBitmap: Bitmap? = null
     private var pixelScaledCanvas: Canvas? = null
@@ -48,9 +53,50 @@ class WinampPlaylistTitleView @JvmOverloads constructor(
     init {
         isClickable = true
         isFocusable = true
-        setOnClickListener {
-            onShadeToggle?.invoke()
+        contentDescription = "Playlist title bar menu"
+    }
+
+    override fun performClick(): Boolean {
+        super.performClick()
+        (actionForClick ?: onMenuRequested)?.invoke()
+        actionForClick = null
+        return true
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                downX = event.x
+                actionForClick = null
+                isPressed = true
+                return true
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val slop = ViewConfiguration.get(context).scaledTouchSlop
+                isPressed = kotlin.math.abs(event.x - downX) <= slop &&
+                    event.y >= 0f && event.y < height
+                return true
+            }
+            MotionEvent.ACTION_UP -> {
+                val slop = ViewConfiguration.get(context).scaledTouchSlop
+                val isTap = kotlin.math.abs(event.x - downX) <= slop &&
+                    event.y >= 0f && event.y < height
+                isPressed = false
+                if (isTap) {
+                    val nativeX = event.x * NATIVE_WIDTH / width.coerceAtLeast(1)
+                    actionForClick = if (nativeX >= 254f) onShadeToggle else onMenuRequested
+                    performClick()
+                }
+                actionForClick = null
+                return true
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                isPressed = false
+                actionForClick = null
+                return true
+            }
         }
+        return true
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {

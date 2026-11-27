@@ -36,6 +36,9 @@ android {
 }
 
 dependencies {
+    // Spotify distributes App Remote as an AAR, so the app packages it while the
+    // optional provider compiles against the official classes.jar artifact.
+    implementation(files("modules/spotify-companion/libs/spotify-app-remote-release-0.8.0.aar"))
     implementation("io.github.gretchycat.libinfiniui:ui-android:0.1.0")
     implementation("io.github.gretchycat.libinfiniselect:select-android:0.2.4")
     implementation(project(":viewer-audio"))

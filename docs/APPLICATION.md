@@ -12,10 +12,11 @@ InfiniMedia is InfiniForge's independent Android audio/video player, playlist ma
 - Play supported video and present supported image/animation items in the visual-media surface.
 - Use the retained PCM-driven spectrum, oscilloscope, and VU prototypes plus a libinfinifx graph over audio artwork and static images, custom player themes/Winamp-style presentation, and available cast or external playback routes.
 - Receive a Folder directory handoff, recursively list supported audio, video, and image resources through libinfiniselect, and assemble an alphabetized queue in Media.
+- Use the hamburger player menu for settings, playlist/output actions, and, in debug builds only, a Spotify workspace for live external playback control, Spotify catalog search, and playlist management.
 
 ## Implementation status
 
-Status note: implementation statements below reflect inspected source. The app unit suite and standalone Android build pass for the pinned source revisions; device appearance/performance still need separate acceptance.
+Status note: implementation statements below reflect inspected source. Spotify account connectivity and live playback behavior still require device acceptance with a configured Development Mode app.
 
 ### Implemented in this checkout
 
@@ -43,6 +44,8 @@ Exact dependency pins are authoritative in this repository's Gradle configuratio
 Infinifolder may supply remote and container access through its public provider contract. InfiniMedia stores the authoritative resource location in queue/playlist data and resolves a current content-access URI through libinfiniselect; temporary relay URIs are not durable playlist identities. Local and SAF playback remain available without Folder. Folder can hand supported resources to Media with Android intents and grants. No special runtime dependency on Infinifolder, Infiniscribe, or Infinikey is required.
 
 ## Planned and potential work
+
+Spotify App Remote controls and metadata, OAuth-backed Web API search, and supported playlist management are implemented in a separate optional provider module. Configure and validate a Development Mode account on an Android device using the [Spotify workspace guide](spotify-companion.md). Features needing separate approval remain individually disabled.
 
 The product direction includes saved effect recipes and persistent per-preset settings, richer palette and animation workflows, richer album-oriented organization beyond current alphabetical directory queues and file-selection grouping, saved non-destructive effect settings, playback ranges, and deterministic video export. Silence removal and any additional casting/output behavior need explicit design and implementation before being described as supported. The app does not currently contain the former heat, momentum, fire, smoke, wind, or lightning simulation.
 

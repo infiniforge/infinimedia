@@ -11,7 +11,12 @@ or Infiniscribe as Gradle projects and does not import their application source.
 - `modules/viewer-audio` owns audio playback UI and service behavior, queues,
   playlist generation and persistence, Cast integration, and the bridge from
   shared audio decoding to Android output. Directory requests use libinfiniselect
-  listings to recursively find supported audio, video and image sources.
+  listings to recursively find supported audio, video and image sources. Its
+  hamburger player menu groups player settings and optional provider entry points.
+- `modules/spotify-companion` owns Spotify OAuth/PKCE storage, the bounded Web
+  API client, App Remote lifecycle, Spotify workspace UI, and per-feature approval
+  flags. It connects only after user action and keeps Spotify playback outside
+  the native decoder and visualization pipeline. See [Spotify workspace](spotify-companion.md).
 - `modules/viewer-video` owns video playback controls, lifecycle, and media
   source leases while using the public `libinfinivideo` API for playback.
 - `modules/viewer-audio` keeps the PCM-driven spectrum, oscilloscope, and VU

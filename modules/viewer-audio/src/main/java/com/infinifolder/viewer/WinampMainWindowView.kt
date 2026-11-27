@@ -42,6 +42,7 @@ class WinampMainWindowView @JvmOverloads constructor(
         fun onToggleRepeat()
         fun onToggleDockedSubwindow()
         fun onClose()
+        fun onMenuRequested()
         fun onVisualizerRequested()
         fun onEqualizerRequested()
     }
@@ -191,7 +192,7 @@ class WinampMainWindowView @JvmOverloads constructor(
         TIMER, VISUALIZER,
         SEEK, VOLUME, BALANCE,
         EQ_BTN, PL_BTN,
-        TITLE_CLOSE, TITLE_SHADE
+        TITLE_MENU, TITLE_CLOSE, TITLE_SHADE
     }
 
     private val accessibleControls = listOf(
@@ -209,6 +210,7 @@ class WinampMainWindowView @JvmOverloads constructor(
         Control.TIMER to android.graphics.Rect(24, 25, 102, 40),
         Control.EQ_BTN to android.graphics.Rect(219, 57, 242, 71),
         Control.PL_BTN to android.graphics.Rect(242, 57, 265, 71),
+        Control.TITLE_MENU to android.graphics.Rect(0, 0, 254, 14),
         Control.TITLE_CLOSE to android.graphics.Rect(264, 2, 274, 13)
     )
     private val accessibility = object : androidx.customview.widget.ExploreByTouchHelper(this) {
@@ -898,6 +900,7 @@ class WinampMainWindowView @JvmOverloads constructor(
             // Titlebar buttons
             x in 264f..274f && y in 2f..13f -> Control.TITLE_CLOSE
             x in 254f..264f && y in 2f..13f -> Control.TITLE_SHADE
+            x in 0f..254f && y in 0f..14f -> Control.TITLE_MENU
             // Timer
             x in 24f..102f && y in 25f..40f -> Control.TIMER
             // Visualizer
@@ -939,6 +942,7 @@ class WinampMainWindowView @JvmOverloads constructor(
             Control.EQ_BTN -> callback?.onEqualizerRequested()
             Control.PL_BTN, Control.TITLE_SHADE -> callback?.onToggleDockedSubwindow()
             Control.TITLE_CLOSE -> callback?.onClose()
+            Control.TITLE_MENU -> callback?.onMenuRequested()
             else -> {}
         }
     }

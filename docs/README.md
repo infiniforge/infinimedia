@@ -7,6 +7,7 @@ reusable GLES effects graph used by the artwork/static-image host pipeline.
 
 - [Application description and implementation status](APPLICATION.md).
 - [Application architecture](architecture.md)
+- [Spotify workspace and Development Mode setup](spotify-companion.md)
 - [Visualization prototypes and effect-library boundary](visualization-prototypes.md)
 - [Storage and URI integration](storage.md)
 - [Audio and sound formats](audio-formats.md)

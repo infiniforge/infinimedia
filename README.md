@@ -103,6 +103,10 @@ Device playback and visual transition behavior still need on-device acceptance.
 
 The queue add flow selects audio, video and images together; InfiniMedia requests all three supported media categories without a category-checkbox prompt. From InfiniFolder, **Queue all media in InfiniMedia** sends the directory identity and access grant to Media. Media recursively lists the directory through libinfiniselect, filters supported audio, video and image items, and queues them alphabetically. Runtime format capabilities and MIME/extension filters determine which items are offered.
 
+## Spotify workspace
+
+Debug builds expose an optional Spotify workspace from the player's hamburger menu with live App Remote playback metadata and controls, Spotify Web API catalog search, playlist browsing, and supported playlist edits. Set up a Development Mode client ID and redirect URI in the workspace; account-specific requirements and individually disabled features are documented in [the Spotify workspace guide](docs/spotify-companion.md).
+
 ## Home-screen mini player
 
 InfiniMedia provides a one-row, horizontally resizable Winamp windowshade widget.

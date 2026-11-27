@@ -22,6 +22,7 @@ dependencies {
     implementation("io.github.infiniforge.libinfinifx:fx-gles:0.1.0")
     implementation("io.github.gretchycat.libinfiniselect:select-android:0.1.0")
     api(project(":viewer-video"))
+    implementation(project(":spotify-companion"))
     api("io.github.gretchycat.libinfiniui:ui-android:0.1.0")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
